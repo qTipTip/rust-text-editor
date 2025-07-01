@@ -27,7 +27,8 @@ impl TextBuffer {
     }
 
     pub fn insert_char(&mut self, ch: char) {
-
+        self.content.insert(self.cursor_position, ch);
+        self.cursor_position += 1;
     }
 
     pub fn delete_char(&mut self) {}
