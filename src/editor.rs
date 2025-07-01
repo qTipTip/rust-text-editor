@@ -97,7 +97,7 @@ impl Editor {
         self.viewport_size = (term_height as usize).saturating_sub(2); // Reserve 2 lines for status
 
         loop {
-            self.update_scroll()?;
+            self.update_scroll();
             self.render()?;
 
             if let Event::Key(key_event) = event::read()? {
@@ -149,9 +149,11 @@ impl Editor {
         let (row, col) = self.buffer.get_cursor_display_position();
         self.write_statusline(row, col)?;
 
-        // Finally, we move the cursor back to the display-position.
-        execute!(stdout(), cursor::MoveTo(col as u16, row as u16))?;
+        // Finally, we move the cursor back to the display-position clamped to the viewport.
+        let viewport_row = row.saturating_sub(self.scroll_offset);
+        execute!(stdout(), cursor::MoveTo(col as u16, viewport_row as u16))?;
         execute!(stdout(), cursor::Show)?;
+        stdout().flush()?;
         Ok(())
     }
 
@@ -230,7 +232,16 @@ impl Editor {
         Ok(false)
     }
 
-    fn update_scroll(&self) -> io::Result<()> {
-        Ok(())
+    fn update_scroll(&mut self) {
+
+        let (cursor_row, _) = self.buffer.get_cursor_display_position();
+
+        if cursor_row >= self.scroll_offset + self.viewport_size {
+            self.scroll_offset = cursor_row - self.viewport_size + 1;
+        }
+
+        if cursor_row < self.scroll_offset {
+            self.scroll_offset = cursor_row;
+        }
     }
 }
