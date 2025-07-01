@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 mod editor;
 mod text_buffer;
 mod syntax;
+mod mode_manager;
 
 fn main() -> io::Result<()> {
     let args: Vec<String> = std::env::args().collect();
