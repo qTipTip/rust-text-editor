@@ -31,7 +31,12 @@ impl TextBuffer {
         self.cursor_position += 1;
     }
 
-    pub fn delete_char(&mut self) {}
+    pub fn delete_char(&mut self) {
+        if self.cursor_position > 0 {
+            self.content.remove(self.cursor_position - 1);
+            self.cursor_position -= 1;
+        }
+    }
 
     pub fn move_cursor_left(&mut self) {}
     pub fn move_cursor_right(&mut self) {}
