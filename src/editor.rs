@@ -70,7 +70,6 @@ impl Editor {
 
     pub fn save_file_as(&mut self) -> io::Result<()> {
         let path = PathBuf::from("test_write.txt");
-        let path_display = path.display();
         self.current_file = Some(path.clone());
         let content = self.buffer.get_content();
         fs::write(&path, content)?;
@@ -117,7 +116,7 @@ impl Editor {
 
     fn render(&self) -> io::Result<()> {
 
-        let (term_width, term_height) = terminal::size()?;
+        let (_, term_height) = terminal::size()?;
         let content_height = (term_height as usize).saturating_sub(2);
         
         
