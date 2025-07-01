@@ -41,7 +41,8 @@ impl TextBuffer {
     pub fn delete_char(&mut self) {
         if self.cursor_position > 0 {
             self.cursor_position -= 1;
-            self.content.remove(self.cursor_position..self.cursor_position + 1);
+            self.content
+                .remove(self.cursor_position..self.cursor_position + 1);
         }
     }
 
@@ -64,6 +65,22 @@ impl TextBuffer {
         // Get the index of the cursor relative to the current line by subtracting the index of the first character.
         let col_idx = self.cursor_position - col_start_idx;
         (row_idx, col_idx)
+    }
+
+    pub fn get_rope_statistics(&self) -> String {
+        let chars = self.content.len_chars();
+        let lines = self.content.len_lines();
+        let bytes = self.content.len_bytes();
+        let chunks = self.content.chunks().count();
+
+        let avg_chunk_size = if chunks > 0 { bytes / chunks } else { 0 };
+
+        let efficiency_ratio = bytes as f64 / avg_chunk_size as f64;
+
+        format!(
+            "C:{} B:{} L:{} Ch:{} AvgChunk:{} Eff:{:.2}",
+            chars, bytes, lines, chunks, avg_chunk_size, efficiency_ratio
+        )
     }
 }
 
@@ -181,7 +198,6 @@ mod tests {
         assert_eq!(row, 0);
         assert_eq!(col, 0);
     }
-
 
     #[test]
     fn test_cursor_display_position_multiple_lines() {

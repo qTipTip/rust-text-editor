@@ -1,10 +1,10 @@
-use std::io;
-use std::io::{stdout, Write};
 use crate::text_buffer::TextBuffer;
-use crossterm::{cursor, event, execute, terminal, terminal::enable_raw_mode};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
-use crossterm::style::{Print};
-use crossterm::terminal::{disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen};
+use crossterm::style::Print;
+use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode};
+use crossterm::{cursor, event, execute, terminal, terminal::enable_raw_mode};
+use std::io;
+use std::io::{Write, stdout};
 
 pub struct Editor {
     buffer: TextBuffer,
@@ -19,7 +19,7 @@ impl Editor {
 
     pub fn with_content(content: String) -> Self {
         Self {
-            buffer: TextBuffer::from_string(content)
+            buffer: TextBuffer::from_string(content),
         }
     }
 
@@ -66,8 +66,16 @@ impl Editor {
 
         // Then we write the statusline
         let (_term_width, term_height) = terminal::size()?;
-        execute!(stdout(), cursor::MoveTo(0, term_height-1))?;
-        execute!(stdout(), Print(format!("Cursor: ({}, {}), | Ctrl+Q to quit", row, col)))?;
+        execute!(stdout(), cursor::MoveTo(0, term_height - 1))?;
+        execute!(
+            stdout(),
+            Print(format!(
+                "Cursor: ({}, {}) Rope: ({})| Ctrl+Q to quit",
+                row,
+                col,
+                self.buffer.get_rope_statistics()
+            ))
+        )?;
 
         // Finally, we move the cursor back to the display-position.
         execute!(stdout(), cursor::RestorePosition)?;
@@ -78,16 +86,13 @@ impl Editor {
 
     fn handle_key_event(&mut self, key_event: KeyEvent) -> io::Result<bool> {
         match key_event.kind {
-            KeyEventKind::Release => {
-                return Ok(false)
-            }
-            KeyEventKind::Press | KeyEventKind::Repeat => {
-            }
+            KeyEventKind::Release => return Ok(false),
+            KeyEventKind::Press | KeyEventKind::Repeat => {}
         }
 
         match key_event.code {
             KeyCode::Char('q') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
-                return Ok(true)
+                return Ok(true);
             }
             KeyCode::Char(ch) => {
                 self.buffer.insert_char(ch);
@@ -104,9 +109,7 @@ impl Editor {
             KeyCode::Enter => {
                 self.buffer.insert_char('\n');
             }
-            _ => {
-
-            }
+            _ => {}
         }
         Ok(false)
     }
