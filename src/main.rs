@@ -51,7 +51,10 @@ impl TextBuffer {
     }
 
     pub fn get_cursor_display_position(&self) -> (usize, usize) {
-        (0, 0)
+        let content_before_cursor = &self.content[..self.cursor_position];
+        let rows = content_before_cursor.lines().count() - 1;
+        let cols = content_before_cursor.lines().last().unwrap_or("").len();
+        (rows, cols)
     }
 
     fn get_next_character_boundary(&self) -> usize {
