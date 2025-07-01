@@ -1,25 +1,38 @@
 use std::cmp::min;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use ropey::Rope;
 
 pub struct TextBuffer {
     content: Rope,
+    original_content: Rope,
+    original_content_hash: u64,
     cursor_position: usize,
+    content_hash: u64,
 }
 
 impl TextBuffer {
     pub fn new() -> TextBuffer {
+        let content = Rope::new();
+        let content_hash = Self::hash_rope(&content);
         TextBuffer {
-            content: Rope::new(),
+            content: content.clone(),
+            original_content: content,
+            original_content_hash: content_hash,
             cursor_position: 0,
+            content_hash,
         }
     }
 
     pub fn from_string(string: String) -> TextBuffer {
         let content = Rope::from(string);
         let cursor_position = content.len_chars();
+        let content_hash = Self::hash_rope(&content);
         TextBuffer {
-            content,
+            content: content.clone(),
             cursor_position,
+            original_content: content,
+            original_content_hash: content_hash,
+            content_hash,
         }
     }
 
@@ -37,6 +50,7 @@ impl TextBuffer {
     pub fn insert_char(&mut self, ch: char) {
         self.content.insert_char(self.cursor_position, ch);
         self.cursor_position += 1;
+        self.update_content_hash();
     }
 
     pub fn delete_char(&mut self) {
@@ -44,6 +58,7 @@ impl TextBuffer {
             self.cursor_position -= 1;
             self.content
                 .remove(self.cursor_position..self.cursor_position + 1);
+            self.update_content_hash();
         }
     }
 
@@ -69,6 +84,10 @@ impl TextBuffer {
 
             self.cursor_position = prev_line_start + min(col_in_line, prev_line_len);
         }
+    }
+
+    fn update_content_hash(&mut self) {
+        self.content_hash = Self::hash_rope(&self.content);
     }
 
     pub fn move_cursor_down(&mut self) {
@@ -108,6 +127,29 @@ impl TextBuffer {
             "C:{} B:{} L:{} Ch:{} AvgChunk:{} Eff:{:.2}",
             chars, bytes, lines, chunks, avg_chunk_size, efficiency_ratio
         )
+    }
+
+    pub fn is_modified(&self) -> bool {
+        if self.content_hash != self.original_content_hash {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn mark_buffer_as_saved(&mut self) {
+        self.original_content = self.content.clone();
+        self.content_hash = Self::hash_rope(&self.content);
+        self.original_content_hash = Self::hash_rope(&self.original_content);
+    }
+
+    fn hash_rope(rope: &Rope) -> u64 {
+        // Iteratively hashes the chunks in a rope.
+        let mut hasher = DefaultHasher::new();
+        for chunk in rope.chunks() {
+            chunk.hash(&mut hasher);
+        }
+        hasher.finish()
     }
 }
 
@@ -264,5 +306,39 @@ mod tests {
 
         assert_eq!(buffer.get_content(), "hello");
         assert_eq!(buffer.get_cursor_position(), 2);
+    }
+
+    #[test]
+    fn test_modified_hash() {
+        let mut buffer = TextBuffer::from_string("hello".to_string());
+        buffer.insert_char(' ');
+        assert!(buffer.is_modified());
+        buffer.delete_char();
+        assert!(!buffer.is_modified());
+    }
+
+    #[test]
+    fn test_modified_hash_with_save() {
+        let mut buffer = TextBuffer::from_string("hello".to_string());
+        buffer.insert_char(' ');
+        assert!(buffer.is_modified());
+        buffer.mark_buffer_as_saved();
+        assert!(!buffer.is_modified());
+    }
+
+    #[test]
+    fn test_long_modified_hash() {
+        let mut buffer = TextBuffer::from_string("hello".to_string());
+        for char in 'a'..'z' {
+            buffer.insert_char(char);
+            assert!(buffer.is_modified());
+        }
+
+        for char in 'a'..'z' {
+            assert!(buffer.is_modified());
+            buffer.delete_char();
+        }
+
+        assert!(!buffer.is_modified());
     }
 }
