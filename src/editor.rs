@@ -62,6 +62,7 @@ impl Editor {
 
         // We compute the cursor-display position, and save it.
         let (row, col) = self.buffer.get_cursor_display_position();
+        execute!(stdout(), cursor::MoveTo(col as u16, row as u16))?;
         execute!(stdout(), cursor::SavePosition)?;
 
         // Then we write the statusline
@@ -79,8 +80,6 @@ impl Editor {
 
         // Finally, we move the cursor back to the display-position.
         execute!(stdout(), cursor::RestorePosition)?;
-
-        stdout().flush()?;
         Ok(())
     }
 
