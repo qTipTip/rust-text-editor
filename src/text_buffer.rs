@@ -6,6 +6,7 @@ pub struct TextBuffer {
     content: Rope,
     original_content: Rope,
     original_content_hash: u64,
+    original_cursor_position: usize,
     cursor_position: usize,
     content_hash: u64,
 }
@@ -18,6 +19,7 @@ impl TextBuffer {
             content: content.clone(),
             original_content: content,
             original_content_hash: content_hash,
+            original_cursor_position: 0,
             cursor_position: 0,
             content_hash,
         }
@@ -30,6 +32,7 @@ impl TextBuffer {
         TextBuffer {
             content: content.clone(),
             cursor_position,
+            original_cursor_position: cursor_position,
             original_content: content,
             original_content_hash: content_hash,
             content_hash,
@@ -140,7 +143,8 @@ impl TextBuffer {
     pub fn mark_buffer_as_saved(&mut self) {
         self.original_content = self.content.clone();
         self.content_hash = Self::hash_rope(&self.content);
-        self.original_content_hash = Self::hash_rope(&self.original_content);
+        self.original_content_hash = Self::hash_rope(&self.content);
+        self.original_cursor_position = self.cursor_position;
     }
 
     fn hash_rope(rope: &Rope) -> u64 {
@@ -154,6 +158,7 @@ impl TextBuffer {
 
     pub fn reset_buffer(&mut self) {
         self.content = self.original_content.clone();
+        self.cursor_position = self.original_cursor_position;
         self.content_hash = Self::hash_rope(&self.content);
     }
 }
@@ -356,8 +361,8 @@ mod tests {
         }
 
         buffer.reset_buffer();
-        assert!(!buffer.is_modified());
 
+        assert!(!buffer.is_modified());
         assert_eq!(buffer.get_content(), "hello");
     }
 }
