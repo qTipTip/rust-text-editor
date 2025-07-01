@@ -201,6 +201,7 @@ impl Editor {
             KeyCode::Char('r') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
                 if self.is_modified() {
                     self.buffer.reset_buffer();
+                    self.update_syntax_tree();
                 }
             }
             KeyCode::Char('s') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -218,9 +219,11 @@ impl Editor {
             }
             KeyCode::Char(ch) => {
                 self.buffer.insert_char(ch);
+                self.update_syntax_tree();
             }
             KeyCode::Backspace => {
                 self.buffer.delete_char();
+                self.update_syntax_tree();
             }
             KeyCode::Left => {
                 self.buffer.move_cursor_left();
@@ -236,6 +239,7 @@ impl Editor {
             }
             KeyCode::Enter => {
                 self.buffer.insert_char('\n');
+                self.update_syntax_tree();
             }
             _ => {}
         }
