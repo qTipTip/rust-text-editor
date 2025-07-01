@@ -3,7 +3,7 @@ use std::io::{stdout, Write};
 use crate::text_buffer::TextBuffer;
 use crossterm::{cursor, event, execute, terminal, terminal::enable_raw_mode};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
-use crossterm::style::Print;
+use crossterm::style::{Print};
 use crossterm::terminal::{disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen};
 
 pub struct Editor {
@@ -53,8 +53,12 @@ impl Editor {
         execute!(stdout(), terminal::Clear(terminal::ClearType::All))?;
         execute!(stdout(), cursor::MoveTo(0, 0))?;
 
+        let buffer_contents = self.buffer.get_content_rope();
         // We then write contents to the screen.
-        execute!(stdout(), Print(&self.buffer.get_content()))?;
+        for (line_idx, line) in buffer_contents.lines().enumerate() {
+            execute!(stdout(), cursor::MoveTo(0, line_idx as u16))?;
+            execute!(stdout(), Print(line))?
+        }
 
         // We compute the cursor-display position, and save it.
         let (row, col) = self.buffer.get_cursor_display_position();
