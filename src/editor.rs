@@ -5,21 +5,28 @@ use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_ra
 use crossterm::{cursor, event, execute, terminal, terminal::enable_raw_mode};
 use std::io;
 use std::io::{Write, stdout};
+use std::path::PathBuf;
 
 pub struct Editor {
     buffer: TextBuffer,
+    current_file: Option<PathBuf>,
+    is_modified: bool,
 }
 
 impl Editor {
     pub fn new() -> Self {
         Self {
             buffer: TextBuffer::new(),
+            current_file: None,
+            is_modified: false,
         }
     }
 
     pub fn with_content(content: String) -> Self {
         Self {
             buffer: TextBuffer::from_string(content),
+            current_file: None,
+            is_modified: false,
         }
     }
 
