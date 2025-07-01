@@ -1,12 +1,14 @@
 use fs::read_to_string;
 use crate::text_buffer::TextBuffer;
+use crate::syntax::{SyntaxHighlighter, HighlightType};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
-use crossterm::style::Print;
+use crossterm::style::{Print, ResetColor, SetStyle};
 use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode};
 use crossterm::{cursor, event, execute, terminal, terminal::enable_raw_mode};
 use std::{fs, io};
 use std::io::{Write, stdout};
 use std::path::PathBuf;
+use tree_sitter::Tree;
 
 pub struct Editor {
     buffer: TextBuffer,
@@ -14,6 +16,8 @@ pub struct Editor {
     viewport_size: usize,
     scroll_offset: usize,
     status_message: String,
+    syntax_highlighter: SyntaxHighlighter,
+    syntax_tree: Option<Tree>,
 }
 
 impl Editor {
@@ -24,28 +28,42 @@ impl Editor {
             viewport_size: 0,
             scroll_offset: 0,
             status_message: "Rust Text Editor".to_string(),
+            syntax_highlighter: SyntaxHighlighter::new(),
+            syntax_tree: None,
         }
     }
 
     pub fn with_content(content: String) -> Self {
-        Self {
+        let mut editor = Self{
             buffer: TextBuffer::from_string(content),
             current_file: None,
             scroll_offset: 0,
             viewport_size: 0,
             status_message: "Rust Text Editor".to_string(),
-        }
+            syntax_highlighter: SyntaxHighlighter::new(),
+            syntax_tree: None,
+        };
+        editor.update_syntax_tree();
+        editor
     }
 
     pub fn open_file(path: PathBuf) -> io::Result<Self> {
         let content = read_to_string(&path)?;
-        Ok(Self {
+        let mut editor = Self {
             buffer: TextBuffer::from_string(content),
             current_file: Some(path.clone()),
             scroll_offset: 0,
             viewport_size: 0,
             status_message: format!("Opened: {}", path.display()),
-        })
+            syntax_highlighter: SyntaxHighlighter::new(),
+            syntax_tree: None,
+        };
+
+        if let Err(e) = editor.syntax_highlighter.set_language_from_path(&path) {
+            editor.status_message = format!("Warning: Could not set syntax highlighting: {}", e)
+        }
+        editor.update_syntax_tree();
+        Ok(editor)
     }
 
     pub fn save_file(&mut self) -> io::Result<()> {
@@ -127,7 +145,7 @@ impl Editor {
             if buffer_line < total_lines {
                 let line = buffer_contents.line(buffer_line);
                 execute!(stdout(), terminal::Clear(terminal::ClearType::CurrentLine))?;
-                execute!(stdout(), Print(line))?;
+                self.render_line_with_highlighting(buffer_line);
             } else {
                 execute!(stdout(), terminal::Clear(terminal::ClearType::CurrentLine))?;
                 execute!(stdout(), Print("~"))?;
@@ -183,6 +201,7 @@ impl Editor {
             KeyCode::Char('r') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
                 if self.is_modified() {
                     self.buffer.reset_buffer();
+                    self.update_syntax_tree();
                 }
             }
             KeyCode::Char('s') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -200,9 +219,11 @@ impl Editor {
             }
             KeyCode::Char(ch) => {
                 self.buffer.insert_char(ch);
+                self.update_syntax_tree();
             }
             KeyCode::Backspace => {
                 self.buffer.delete_char();
+                self.update_syntax_tree();
             }
             KeyCode::Left => {
                 self.buffer.move_cursor_left();
@@ -218,6 +239,7 @@ impl Editor {
             }
             KeyCode::Enter => {
                 self.buffer.insert_char('\n');
+                self.update_syntax_tree();
             }
             _ => {}
         }
@@ -239,5 +261,52 @@ impl Editor {
 
     fn is_modified(&self) -> bool {
         self.buffer.is_modified()
+    }
+
+    fn update_syntax_tree(&mut self) {
+        let content = self.buffer.get_content();
+        self.syntax_tree = self.syntax_highlighter.parse(&content);
+    }
+
+    fn render_line_with_highlighting(&self, line_idx: usize) -> io::Result<()> {
+        let buffer_contents = self.buffer.get_content_rope();
+        let line = buffer_contents.line(line_idx);
+        let line_str = line.to_string();
+
+        let highlights = if let Some(tree) = &self.syntax_tree {
+            self.syntax_highlighter.highlight_line(buffer_contents, line_idx, tree)
+        } else {
+            Vec::new()
+        };
+
+        if highlights.is_empty() {
+            execute!(stdout(), Print(&line_str))?;
+            return Ok(());
+        }
+
+        let mut current_pos = 0;
+        let line_chars: Vec<char> = line_str.chars().collect();
+
+        for (start, end, highlight_type) in highlights {
+            if current_pos < start {
+                let before_text: String = line_chars[current_pos..start].iter().collect();
+                execute!(stdout(), ResetColor, Print(before_text))?;
+            }
+
+            if start < end && end <= line_chars.len() {
+                let highlighted_text: String = line_chars[start..end].iter().collect();
+                let style = highlight_type.to_style();
+                execute!(stdout(), SetStyle(style), Print(highlighted_text), ResetColor)?;
+            }
+
+            current_pos = end;
+        }
+
+        if current_pos < line_chars.len() {
+            let remaining_text: String = line_chars[current_pos..].iter().collect();
+            execute!(stdout(), Print(remaining_text))?;
+        }
+
+        Ok(())
     }
 }
