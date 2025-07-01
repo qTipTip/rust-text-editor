@@ -1,0 +1,94 @@
+use std::io;
+use std::io::{stdout, Write};
+use crate::text_buffer::TextBuffer;
+use crossterm::{cursor, event, execute, terminal, terminal::enable_raw_mode};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::style::Print;
+use crossterm::terminal::{disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen};
+
+pub struct Editor {
+    buffer: TextBuffer,
+}
+
+impl Editor {
+    pub fn new() -> Self {
+        Self {
+            buffer: TextBuffer::new(),
+        }
+    }
+
+    pub fn with_content(content: String) -> Self {
+        Self {
+            buffer: TextBuffer::from_string(content)
+        }
+    }
+
+    pub fn run(&mut self) -> io::Result<()> {
+        enable_raw_mode()?;
+        execute!(stdout(), EnterAlternateScreen)?;
+
+        let result = self.event_loop();
+
+        disable_raw_mode()?;
+        execute!(stdout(), LeaveAlternateScreen)?;
+
+        result
+    }
+
+    fn event_loop(&mut self) -> io::Result<()> {
+        loop {
+            self.render()?;
+
+            if let Event::Key(key_event) = event::read()? {
+                if self.handle_key_event(key_event)? {
+                    break;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn render(&self) -> io::Result<()> {
+        execute!(stdout(), terminal::Clear(terminal::ClearType::All))?;
+        execute!(stdout(), cursor::MoveTo(0, 0))?;
+
+        execute!(stdout(), Print(&self.buffer.get_content()))?;
+
+        let (row, col) = self.buffer.get_cursor_display_position();
+        execute!(stdout(), cursor::MoveTo(row as u16, col as u16))?;
+
+        let (term_width, term_height) = terminal::size()?;
+        execute!(stdout(), cursor::MoveTo(0, term_height-1))?;
+        execute!(stdout(), Print(format!("Cursor: ({}, {}), | Ctrl+Q to quit", row, col)))?;
+
+        stdout().flush()?;
+        Ok(())
+    }
+
+    fn handle_key_event(&mut self, key_event: KeyEvent) -> io::Result<bool> {
+        match key_event.code {
+            KeyCode::Char('q') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
+                return Ok(true)
+            }
+            KeyCode::Char(ch) => {
+                self.buffer.insert_char(ch);
+            }
+            KeyCode::Backspace => {
+                self.buffer.delete_char();
+            }
+            KeyCode::Left => {
+                self.buffer.move_cursor_left();
+            }
+            KeyCode::Right => {
+                self.buffer.move_cursor_right();
+            }
+            KeyCode::Enter => {
+                self.buffer.insert_char('\n');
+            }
+            _ => {
+
+            }
+        }
+        Ok(false)
+    }
+}
