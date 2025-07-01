@@ -151,6 +151,11 @@ impl TextBuffer {
         }
         hasher.finish()
     }
+
+    pub fn reset_buffer(&mut self) {
+        self.content = self.original_content.clone();
+        self.content_hash = Self::hash_rope(&self.content);
+    }
 }
 
 #[cfg(test)]
@@ -340,5 +345,19 @@ mod tests {
         }
 
         assert!(!buffer.is_modified());
+    }
+
+    #[test]
+    fn test_reset_buffer() {
+        let mut buffer = TextBuffer::from_string("hello".to_string());
+        for char in 'a'..'z' {
+            buffer.insert_char(char);
+            assert!(buffer.is_modified());
+        }
+
+        buffer.reset_buffer();
+        assert!(!buffer.is_modified());
+
+        assert_eq!(buffer.get_content(), "hello");
     }
 }
