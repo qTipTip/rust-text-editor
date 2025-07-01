@@ -49,17 +49,25 @@ impl Editor {
     }
 
     fn render(&self) -> io::Result<()> {
+        // Flush the terminal, and set the cursor to (0,0)
         execute!(stdout(), terminal::Clear(terminal::ClearType::All))?;
         execute!(stdout(), cursor::MoveTo(0, 0))?;
 
+        // We then write contents to the screen.
         execute!(stdout(), Print(&self.buffer.get_content()))?;
 
+        // We compute the cursor-display position, and save it.
         let (row, col) = self.buffer.get_cursor_display_position();
-        execute!(stdout(), cursor::MoveTo(row as u16, col as u16))?;
+        execute!(stdout(), cursor::SavePosition)?;
 
-        let (term_width, term_height) = terminal::size()?;
+        // Then we write the statusline
+        let (_term_width, term_height) = terminal::size()?;
         execute!(stdout(), cursor::MoveTo(0, term_height-1))?;
         execute!(stdout(), Print(format!("Cursor: ({}, {}), | Ctrl+Q to quit", row, col)))?;
+
+        // Finally, we move the cursor back to the display-position.
+        execute!(stdout(), cursor::RestorePosition)?;
+
         stdout().flush()?;
         Ok(())
     }
