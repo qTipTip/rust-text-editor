@@ -1,3 +1,4 @@
+use std::cmp::min;
 use ropey::Rope;
 
 pub struct TextBuffer {
@@ -54,6 +55,32 @@ impl TextBuffer {
     pub fn move_cursor_right(&mut self) {
         if self.cursor_position < self.content.len_chars() {
             self.cursor_position += 1;
+        }
+    }
+
+    pub fn move_cursor_up(&mut self) {
+        let line_idx = self.content.char_to_line(self.cursor_position);
+        if line_idx > 0 {
+            let current_line_start = self.content.line_to_char(line_idx);
+            let col_in_line = self.cursor_position - current_line_start;
+
+            let prev_line_start = self.content.line_to_char(line_idx - 1);
+            let prev_line_len = self.content.line(line_idx-1).len_chars();
+
+            self.cursor_position = prev_line_start + min(col_in_line, prev_line_len);
+        }
+    }
+
+    pub fn move_cursor_down(&mut self) {
+        let line_idx = self.content.char_to_line(self.cursor_position);
+        if line_idx < self.content.len_lines() - 1 {
+            let current_line_start = self.content.line_to_char(line_idx);
+            let col_in_line = self.cursor_position - current_line_start;
+
+            let prev_line_start = self.content.line_to_char(line_idx + 1);
+            let prev_line_len = self.content.line(line_idx+1).len_chars();
+
+            self.cursor_position = prev_line_start + min(col_in_line, prev_line_len);
         }
     }
 
@@ -146,6 +173,27 @@ mod tests {
         assert_eq!(buffer.get_cursor_position(), 3);
     }
 
+    #[test]
+    fn test_cursor_movement_up() {
+        let mut buffer = TextBuffer::from_string("hello\nworld".to_string());
+        buffer.cursor_position = 9; // After the r
+        buffer.move_cursor_up();
+        assert_eq!(buffer.get_cursor_position(), 3);
+
+        buffer.move_cursor_up();
+        assert_eq!(buffer.get_cursor_position(), 3);
+    }
+
+    #[test]
+    fn test_cursor_movement_down() {
+        let mut buffer = TextBuffer::from_string("hello\nworld".to_string());
+        buffer.cursor_position = 3; // After the r
+        buffer.move_cursor_down();
+        assert_eq!(buffer.get_cursor_position(), 9);
+
+        buffer.move_cursor_down();
+        assert_eq!(buffer.get_cursor_position(), 9);
+    }
     #[test]
     fn test_cursor_movement_right() {
         let mut buffer = TextBuffer::from_string("hello".to_string());

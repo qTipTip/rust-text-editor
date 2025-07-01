@@ -94,6 +94,9 @@ impl Editor {
             KeyCode::Char('q') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
                 return Ok(true);
             }
+            KeyCode::Char('s') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
+                // self.save_buffer();
+            }
             KeyCode::Char(ch) => {
                 self.buffer.insert_char(ch);
             }
@@ -105,6 +108,12 @@ impl Editor {
             }
             KeyCode::Right => {
                 self.buffer.move_cursor_right();
+            }
+            KeyCode::Up => {
+                self.buffer.move_cursor_up();
+            }
+            KeyCode::Down => {
+                self.buffer.move_cursor_down();
             }
             KeyCode::Enter => {
                 self.buffer.insert_char('\n');
