@@ -1,25 +1,32 @@
+use ropey::Rope;
+
 pub struct TextBuffer {
-    content: String,
+    content: Rope,
     cursor_position: usize,
 }
 
 impl TextBuffer {
     pub fn new() -> TextBuffer {
         TextBuffer {
-            content: String::new(),
+            content: Rope::new(),
             cursor_position: 0,
         }
     }
 
-    pub fn from_string(content: String) -> TextBuffer {
-        let cursor_position = content.len();
+    pub fn from_string(string: String) -> TextBuffer {
+        let content = Rope::from(string);
+        let cursor_position = content.len_chars();
         TextBuffer {
             content,
             cursor_position,
         }
     }
 
-    pub fn get_content(&self) -> &str {
+    pub fn get_content(&self) -> String {
+        self.content.to_string()
+    }
+
+    pub fn get_content_rope(&self) -> &Rope {
         &self.content
     }
     pub fn get_cursor_position(&self) -> usize {
@@ -27,59 +34,36 @@ impl TextBuffer {
     }
 
     pub fn insert_char(&mut self, ch: char) {
-        self.content.insert(self.cursor_position, ch);
-        self.cursor_position += ch.len_utf8();
+        self.content.insert_char(self.cursor_position, ch);
+        self.cursor_position += 1;
     }
 
     pub fn delete_char(&mut self) {
         if self.cursor_position > 0 {
-            let prev_char_boundary = self.get_previous_character_boundary();
-            self.content.remove(prev_char_boundary);
-            self.cursor_position = prev_char_boundary;
+            self.cursor_position -= 1;
+            self.content.remove(self.cursor_position..self.cursor_position + 1);
         }
     }
 
     pub fn move_cursor_left(&mut self) {
         if self.cursor_position > 0 {
-            self.cursor_position = self.get_previous_character_boundary();
+            self.cursor_position -= 1;
         }
     }
     pub fn move_cursor_right(&mut self) {
-        if self.cursor_position < self.content.len() {
-            self.cursor_position = self.get_next_character_boundary();
+        if self.cursor_position < self.content.len_chars() {
+            self.cursor_position += 1;
         }
     }
 
     pub fn get_cursor_display_position(&self) -> (usize, usize) {
-        let content_before_cursor = &self.content[..self.cursor_position];
-        let rows = match content_before_cursor.lines().count() {
-            0 => 0,
-            n => n - 1,
-        };
-        let cols = content_before_cursor.lines().last().unwrap_or("").len();
-        (rows, cols)
-    }
-
-    fn get_next_character_boundary(&self) -> usize {
-        let mut pos = self.cursor_position;
-        while pos < self.content.len() {
-            pos += 1;
-            if self.content.is_char_boundary(pos) {
-                break;
-            }
-        }
-        pos
-    }
-
-    fn get_previous_character_boundary(&self) -> usize {
-        let mut pos = self.cursor_position;
-        while pos > 0 {
-            pos -= 1;
-            if self.content.is_char_boundary(pos) {
-                break
-            }
-        }
-        pos
+        // Get the index of the line the cursor is on
+        let row_idx = self.content.char_to_line(self.cursor_position);
+        // Get the index of the first character of the line
+        let col_start_idx = self.content.line_to_char(row_idx);
+        // Get the index of the cursor relative to the current line by subtracting the index of the first character.
+        let col_idx = self.cursor_position - col_start_idx;
+        (row_idx, col_idx)
     }
 }
 
@@ -177,8 +161,7 @@ mod tests {
         buffer.insert_char('é'); // Accented character
 
         assert_eq!(buffer.get_content(), "🦀é");
-        // Unicode characters take multiple bytes
-        assert!(buffer.get_cursor_position() > 2);
+        assert_eq!(buffer.get_cursor_position(), 2);
     }
 
     #[test]
