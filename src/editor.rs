@@ -11,7 +11,6 @@ use std::path::PathBuf;
 pub struct Editor {
     buffer: TextBuffer,
     current_file: Option<PathBuf>,
-    is_modified: bool,
     viewport_size: usize,
     scroll_offset: usize,
     status_message: String,
@@ -24,7 +23,6 @@ impl Editor {
             current_file: None,
             viewport_size: 0,
             scroll_offset: 0,
-            is_modified: false,
             status_message: "Rust Text Editor".to_string(),
         }
     }
@@ -35,7 +33,6 @@ impl Editor {
             current_file: None,
             scroll_offset: 0,
             viewport_size: 0,
-            is_modified: false,
             status_message: "Rust Text Editor".to_string(),
         }
     }
@@ -47,7 +44,6 @@ impl Editor {
             current_file: Some(path.clone()),
             scroll_offset: 0,
             viewport_size: 0,
-            is_modified: false,
             status_message: format!("Opened: {}", path.display()),
         })
     }
@@ -61,7 +57,7 @@ impl Editor {
             Some(path) => {
                 let content = self.buffer.get_content();
                 fs::write(path, content)?;
-                self.is_modified = false;
+                self.buffer.mark_buffer_as_saved();
                 self.status_message = format!("Saved: {}", path.display());
                 Ok(())
             }
@@ -73,7 +69,7 @@ impl Editor {
         self.current_file = Some(path.clone());
         let content = self.buffer.get_content();
         fs::write(&path, content)?;
-        self.is_modified = false;
+        self.buffer.mark_buffer_as_saved();
         self.status_message = format!("Saved: {}", path.display());
         Ok(())
     }
@@ -108,11 +104,6 @@ impl Editor {
         Ok(())
     }
 
-    fn mark_modified(&mut self) {
-        if !self.is_modified {
-            self.is_modified = true;
-        }
-    }
 
     fn render(&self) -> io::Result<()> {
 
@@ -183,11 +174,16 @@ impl Editor {
 
         match key_event.code {
             KeyCode::Char('q') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
-                if self.is_modified {
+                if self.is_modified() {
                     self.status_message = "File modified, press ctrl-q to quit without saving".to_string();
                     return Ok(false);
                 }
                 return Ok(true);
+            }
+            KeyCode::Char('r') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
+                if self.is_modified() {
+                    self.buffer.reset_buffer();
+                }
             }
             KeyCode::Char('s') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
                 match self.save_file() {
@@ -204,11 +200,9 @@ impl Editor {
             }
             KeyCode::Char(ch) => {
                 self.buffer.insert_char(ch);
-                self.mark_modified();
             }
             KeyCode::Backspace => {
                 self.buffer.delete_char();
-                self.mark_modified();
             }
             KeyCode::Left => {
                 self.buffer.move_cursor_left();
@@ -224,7 +218,6 @@ impl Editor {
             }
             KeyCode::Enter => {
                 self.buffer.insert_char('\n');
-                self.mark_modified();
             }
             _ => {}
         }
@@ -242,5 +235,9 @@ impl Editor {
         if cursor_row < self.scroll_offset {
             self.scroll_offset = cursor_row;
         }
+    }
+
+    fn is_modified(&self) -> bool {
+        self.buffer.is_modified()
     }
 }
