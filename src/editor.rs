@@ -1,9 +1,10 @@
+use fs::read_to_string;
 use crate::text_buffer::TextBuffer;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use crossterm::style::Print;
 use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode};
 use crossterm::{cursor, event, execute, terminal, terminal::enable_raw_mode};
-use std::io;
+use std::{fs, io};
 use std::io::{Write, stdout};
 use std::path::PathBuf;
 
@@ -28,6 +29,39 @@ impl Editor {
             current_file: None,
             is_modified: false,
         }
+    }
+
+    pub fn open_file(path: PathBuf) -> io::Result<Self> {
+        let content = read_to_string(&path)?;
+        Ok(Self {
+            buffer: TextBuffer::from_string(content),
+            current_file: Some(path.clone()),
+            is_modified: false,
+        })
+    }
+
+    pub fn save_file(&mut self) -> io::Result<()> {
+        match &self.current_file {
+            None => {
+                println!("Press ctrl-A to save-as");
+                Ok(())
+            }
+            Some(path) => {
+                let content = self.buffer.get_content();
+                fs::write(path, content)?;
+                self.is_modified = false;
+                Ok(())
+            }
+        }
+    }
+
+    pub fn save_file_as(&mut self) -> io::Result<()> {
+        let path = PathBuf::from("test_write.txt");
+        self.current_file = Some(path.clone());
+        let content = self.buffer.get_content();
+        fs::write(path, content)?;
+        self.is_modified = false;
+        Ok(())
     }
 
     pub fn run(&mut self) -> io::Result<()> {
@@ -101,7 +135,15 @@ impl Editor {
                 return Ok(true);
             }
             KeyCode::Char('s') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
-                // self.save_buffer();
+                match self.save_file() {
+                    Ok(_) => {}
+                    Err(_) => {}
+                }
+            }
+            KeyCode::Char('a') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
+                match self.save_file_as() {
+                    Ok(_) | Err(_) => {},
+                }
             }
             KeyCode::Char(ch) => {
                 self.buffer.insert_char(ch);
