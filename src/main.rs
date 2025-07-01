@@ -28,27 +28,55 @@ impl TextBuffer {
 
     pub fn insert_char(&mut self, ch: char) {
         self.content.insert(self.cursor_position, ch);
-        self.cursor_position += 1;
+        self.cursor_position += ch.len_utf8();
     }
 
     pub fn delete_char(&mut self) {
         if self.cursor_position > 0 {
-            self.content.remove(self.cursor_position - 1);
-            self.cursor_position -= 1;
+            let prev_char_boundary = self.get_previous_character_boundary();
+            self.content.remove(prev_char_boundary);
+            self.cursor_position = prev_char_boundary;
         }
     }
 
-    pub fn move_cursor_left(&mut self) {}
-    pub fn move_cursor_right(&mut self) {}
+    pub fn move_cursor_left(&mut self) {
+        if self.cursor_position > 0 {
+            self.cursor_position = self.get_previous_character_boundary();
+        }
+    }
+    pub fn move_cursor_right(&mut self) {
+        if self.cursor_position < self.content.len() {
+            self.cursor_position = self.get_next_character_boundary();
+        }
+    }
 
     pub fn get_cursor_display_position(&self) -> (usize, usize) {
         (0, 0)
     }
+
+    fn get_next_character_boundary(&self) -> usize {
+        let mut pos = self.cursor_position;
+        while pos < self.content.len() {
+            pos += 1;
+            if self.content.is_char_boundary(pos) {
+                break;
+            }
+        }
+        pos
+    }
+
+    fn get_previous_character_boundary(&self) -> usize {
+        let mut pos = self.cursor_position;
+        while pos > 0 {
+            pos -= 1;
+            if self.content.is_char_boundary(pos) {
+                break
+            }
+        }
+        pos
+    }
 }
 
-fn main() {
-    println!("Hello, rust-text-editor!");
-}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -174,4 +202,14 @@ mod tests {
         assert_eq!(buffer.get_content(), "hello");
         assert_eq!(buffer.get_cursor_position(), 2);
     }
+}
+
+fn main() {
+    let mut buffer = TextBuffer::new();
+    // buffer.insert_char('🦀'); // Rust crab emoji
+    // buffer.insert_char('é'); // Accented character
+    for c in { 'a'..'z' } {
+        buffer.insert_char(c);
+    }
+    println!("{}", buffer.get_content());
 }
