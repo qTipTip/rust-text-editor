@@ -5,14 +5,12 @@ use crate::text_buffer::TextBuffer;
 
 pub struct EditorServer {
     clients: HashMap<ClientId, Client>,
-    client_count: usize,
     buffers: HashMap<BufferId, TextBuffer>,
-    buffer_count: usize,
 }
 
 impl EditorServer {
     pub async fn new() -> Self {
-        Self { clients: HashMap::new(), client_count: 0, buffers: HashMap::new(), buffer_count: 0 }
+        Self { clients: HashMap::new(), buffers: HashMap::new() }
     }
     pub async fn set_edit_mode(&self, buffer_id: BufferId, mode: EditMode) -> ServerResult<()> {
         todo!()
@@ -62,7 +60,7 @@ impl EditorServer {
         }
     }
     pub fn buffer_count(&self) -> usize {
-        self.buffer_count
+        self.buffers.len()
     }
     pub async fn create_buffer(&mut self, client_id: ClientId, content: Option<String>) -> ServerResult<BufferId> {
         let buffer = match content {
@@ -76,7 +74,6 @@ impl EditorServer {
 
         let buffer_id = BufferId::new();
         self.buffers.insert(buffer_id, buffer);
-        self.buffer_count += 1;
 
         Ok(buffer_id)
 
@@ -86,8 +83,13 @@ impl EditorServer {
         todo!()
     }
 
-    pub async fn disconnect_client(&self, client_id: ClientId) -> ServerResult<()> {
-        todo!()
+    pub async fn disconnect_client(&mut self, client_id: ClientId) -> ServerResult<()> {
+        match self.clients.remove(&client_id) {
+            None => {}
+            Some(client) => {
+                
+            }
+        }
     }
 
     pub fn client_count(&self) -> usize {
