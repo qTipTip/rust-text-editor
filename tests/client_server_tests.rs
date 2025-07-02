@@ -1,6 +1,7 @@
-use rust_text_editor::server::*;
+use rust_text_editor::server::editor_server::EditorServer;
 use tokio::time::{timeout, Duration};
 use std::collections::HashMap;
+use rust_text_editor::server::events::{BufferId, ClientId, EditMode, EditorEvent};
 
 #[tokio::test]
 async fn test_server_creation() {

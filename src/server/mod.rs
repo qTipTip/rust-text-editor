@@ -1,3 +1,3 @@
-mod editor_server;
-mod client;
-mod events;
+pub mod editor_server;
+pub mod client;
+pub mod events;
