@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 crossterm = "0.29.0"
+futures = "0.3.31"
 ropey = "1.6.1"
 serde = { version = "1.0.219", features = ["derive"] }
 tokio = { version = "1.46.0", features = ["full"] }
