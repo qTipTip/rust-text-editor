@@ -62,7 +62,7 @@ impl EditorServer {
         }
     }
     pub fn buffer_count(&self) -> usize {
-        todo!()
+        self.buffer_count
     }
     pub async fn create_buffer(&mut self, client_id: ClientId, content: Option<String>) -> ServerResult<BufferId> {
         let buffer = match content {
@@ -73,13 +73,13 @@ impl EditorServer {
                 TextBuffer::from_string(content)
             }
         };
-        
+
         let buffer_id = BufferId::new();
         self.buffers.insert(buffer_id, buffer);
         self.buffer_count += 1;
-        
+
         Ok(buffer_id)
-        
+
     }
 
     pub fn is_client_connected(&self, client_id: ClientId) -> bool {
