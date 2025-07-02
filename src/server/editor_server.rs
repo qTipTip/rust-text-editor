@@ -53,16 +53,28 @@ impl EditorServer {
         todo!()
     }
 
-    pub async fn delete_char(&self, buffer_id: BufferId, position: i32) -> ServerResult<()> {
-        todo!()
+    pub async fn delete_char(&mut self, buffer_id: BufferId, position: i32) -> ServerResult<()> {
+        match self.buffers.get_mut(&buffer_id) {
+            None => Err(ServerError::BufferNotFound),
+            Some(buffer) => {
+                buffer.delete_char_at_position(position as usize);
+                Ok(())
+            }
+        }
     }
     pub async fn insert_char(
-        &self,
+        &mut self,
         buffer_id: BufferId,
         position: i32,
         ch: char,
     ) -> ServerResult<()> {
-        todo!()
+        match self.buffers.get_mut(&buffer_id) {
+            None => Err(ServerError::BufferNotFound),
+            Some(buffer) => {
+                buffer.insert_char_at_position(position as usize, ch);
+                Ok(())
+            }
+        }
     }
 
     pub async fn get_buffer_content(&self, buffer_id: BufferId) -> ServerResult<String> {
@@ -91,15 +103,14 @@ impl EditorServer {
     }
 
     pub fn is_client_connected(&self, client_id: ClientId) -> bool {
-        if self.clients.contains_key(&client_id) {
-            true
-        } else {
-            false
-        }
+        self.clients.contains_key(&client_id)
     }
 
     pub async fn disconnect_client(&mut self, client_id: ClientId) -> ServerResult<()> {
-        todo!()
+        match self.clients.remove(&client_id) {
+            None => Err(ServerError::ClientNotFound),
+            Some(_) => Ok(()),
+        }
     }
 
     pub fn client_count(&self) -> usize {
@@ -111,6 +122,6 @@ impl EditorServer {
         let client = Client::new();
 
         self.clients.insert(client_id, client);
-        Ok(ClientId::new())
+        Ok(client_id)
     }
 }
