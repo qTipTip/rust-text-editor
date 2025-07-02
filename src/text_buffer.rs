@@ -1,6 +1,7 @@
+use ropey::Rope;
 use std::cmp::min;
 use std::hash::{DefaultHasher, Hash, Hasher};
-use ropey::Rope;
+use crate::server::events::EditMode;
 
 pub struct TextBuffer {
     content: Rope,
@@ -9,6 +10,7 @@ pub struct TextBuffer {
     original_cursor_position: usize,
     cursor_position: usize,
     content_hash: u64,
+    edit_mode: EditMode
 }
 
 impl TextBuffer {
@@ -22,6 +24,7 @@ impl TextBuffer {
             original_cursor_position: 0,
             cursor_position: 0,
             content_hash,
+            edit_mode: EditMode::Normal,
         }
     }
 
@@ -36,6 +39,7 @@ impl TextBuffer {
             original_content: content,
             original_content_hash: content_hash,
             content_hash,
+            edit_mode: EditMode::Normal,
         }
     }
 
@@ -50,6 +54,37 @@ impl TextBuffer {
         self.cursor_position
     }
 
+    pub fn set_cursor_position(&mut self, position: usize) -> Result<(), String> {
+        if position > self.content.len_chars() {
+            Err("Attempting to set cursor position out of bounds".to_string())
+        } else {
+            self.cursor_position = position;
+            Ok(())
+        }
+    }
+    pub fn insert_char_at_position(&mut self, position: usize, ch: char) {
+        self.content.insert_char(position, ch);
+
+        // If we insert at cursor position or to the left, we move the cursor position to the right
+        if position <= self.cursor_position {
+            self.move_cursor_right();
+        }
+    }
+
+    pub fn delete_char_at_position(&mut self, position: usize) -> Result<char, String> {
+        if position >= self.content.len_chars() {
+            return Err("Position out of bounds".to_string());
+        }
+
+        let deleted_char = self.content.char(position);
+        self.content.remove(position..position + 1);
+
+        if position < self.cursor_position {
+            self.cursor_position -= 1;
+        }
+
+        Ok(deleted_char)
+    }
     pub fn insert_char(&mut self, ch: char) {
         self.content.insert_char(self.cursor_position, ch);
         self.cursor_position += 1;
@@ -83,7 +118,7 @@ impl TextBuffer {
             let col_in_line = self.cursor_position - current_line_start;
 
             let prev_line_start = self.content.line_to_char(line_idx - 1);
-            let prev_line_len = self.content.line(line_idx-1).len_chars();
+            let prev_line_len = self.content.line(line_idx - 1).len_chars();
 
             self.cursor_position = prev_line_start + min(col_in_line, prev_line_len);
         }
@@ -100,7 +135,7 @@ impl TextBuffer {
             let col_in_line = self.cursor_position - current_line_start;
 
             let prev_line_start = self.content.line_to_char(line_idx + 1);
-            let prev_line_len = self.content.line(line_idx+1).len_chars();
+            let prev_line_len = self.content.line(line_idx + 1).len_chars();
 
             self.cursor_position = prev_line_start + min(col_in_line, prev_line_len);
         }
@@ -161,6 +196,15 @@ impl TextBuffer {
         self.cursor_position = self.original_cursor_position;
         self.content_hash = Self::hash_rope(&self.content);
     }
+
+    pub fn get_edit_mode(&self) -> EditMode {
+        self.edit_mode.clone()
+    }
+
+    pub fn set_edit_mode(&mut self, mode: EditMode) {
+        self.edit_mode = mode;
+    }
+
 }
 
 #[cfg(test)]
@@ -364,5 +408,137 @@ mod tests {
 
         assert!(!buffer.is_modified());
         assert_eq!(buffer.get_content(), "hello");
+    }
+
+    #[test]
+    fn test_set_cursor_position_valid() {
+        let mut buffer = TextBuffer::from_string("hello".to_string());
+
+        // Should succeed for valid positions
+        assert!(buffer.set_cursor_position(0).is_ok());
+        assert_eq!(buffer.get_cursor_position(), 0);
+
+        assert!(buffer.set_cursor_position(3).is_ok());
+        assert_eq!(buffer.get_cursor_position(), 3);
+
+        assert!(buffer.set_cursor_position(5).is_ok()); // End of string
+        assert_eq!(buffer.get_cursor_position(), 5);
+    }
+
+    #[test]
+    fn test_set_cursor_position_invalid() {
+        let mut buffer = TextBuffer::from_string("hello".to_string());
+
+        // Should fail for out of bounds
+        assert!(buffer.set_cursor_position(6).is_err());
+
+        // Cursor should remain unchanged after failed set
+        let original_pos = buffer.get_cursor_position();
+        let _ = buffer.set_cursor_position(10);
+        assert_eq!(buffer.get_cursor_position(), original_pos);
+    }
+
+    #[test]
+    fn test_insert_char_at_position_beginning() {
+        let mut buffer = TextBuffer::from_string("hello".to_string());
+        buffer.set_cursor_position(3).unwrap(); // Cursor at 'l'
+
+        buffer.insert_char_at_position(0, 'X');
+
+        assert_eq!(buffer.get_content(), "Xhello");
+        assert_eq!(buffer.get_cursor_position(), 4); // Cursor moved right
+    }
+
+    #[test]
+    fn test_insert_char_at_position_middle() {
+        let mut buffer = TextBuffer::from_string("hello".to_string());
+        buffer.set_cursor_position(1).unwrap(); // Cursor at 'e'
+
+        buffer.insert_char_at_position(3, 'X'); // Insert after cursor
+
+        assert_eq!(buffer.get_content(), "helXlo");
+        assert_eq!(buffer.get_cursor_position(), 1); // Cursor unchanged
+    }
+
+    #[test]
+    fn test_insert_char_at_position_before_cursor() {
+        let mut buffer = TextBuffer::from_string("hello".to_string());
+        buffer.set_cursor_position(3).unwrap(); // Cursor at first 'l'
+
+        buffer.insert_char_at_position(2, 'X'); // Insert before cursor
+
+        assert_eq!(buffer.get_content(), "heXllo");
+        assert_eq!(buffer.get_cursor_position(), 4); // Cursor moved right
+    }
+
+    #[test]
+    fn test_insert_char_at_position_at_cursor() {
+        let mut buffer = TextBuffer::from_string("hello".to_string());
+        buffer.set_cursor_position(2).unwrap(); // Cursor at first 'l'
+
+        buffer.insert_char_at_position(2, 'X'); // Insert exactly at cursor
+
+        assert_eq!(buffer.get_content(), "heXllo");
+        // What should happen to cursor when inserting AT cursor position?
+        // Your current logic: position <= cursor_position, so cursor moves right
+        assert_eq!(buffer.get_cursor_position(), 3);
+    }
+
+    #[test]
+    fn test_delete_char_at_position_before_cursor() {
+        let mut buffer = TextBuffer::from_string("hello".to_string());
+        buffer.set_cursor_position(3).unwrap(); // Cursor at first 'l'
+
+        buffer.delete_char_at_position(1); // Delete 'e'
+
+        assert_eq!(buffer.get_content(), "hllo");
+        assert_eq!(buffer.get_cursor_position(), 2); // Cursor moved left
+    }
+
+    #[test]
+    fn test_delete_char_at_position_after_cursor() {
+        let mut buffer = TextBuffer::from_string("hello".to_string());
+        buffer.set_cursor_position(1).unwrap(); // Cursor at 'e'
+
+        buffer.delete_char_at_position(3); // Delete first 'l'
+
+        assert_eq!(buffer.get_content(), "helo");
+        assert_eq!(buffer.get_cursor_position(), 1); // Cursor unchanged
+    }
+
+    #[test]
+    fn test_delete_char_at_position_at_cursor() {
+        let mut buffer = TextBuffer::from_string("hello".to_string());
+        buffer.set_cursor_position(2).unwrap(); // Cursor at first 'l'
+
+        buffer.delete_char_at_position(2); // Delete character AT cursor
+
+        assert_eq!(buffer.get_content(), "helo");
+        // What should cursor position be after deleting AT cursor?
+        // Your current logic: position < cursor_position (false), so no change
+        assert_eq!(buffer.get_cursor_position(), 2);
+    }
+
+
+    #[test]
+    fn test_delete_char_out_of_bounds() {
+        let mut buffer = TextBuffer::from_string("hi".to_string());
+
+        // Should this panic, or gracefully handle?
+        buffer.delete_char_at_position(5);
+    }
+
+    #[test]
+    fn test_position_methods_with_unicode() {
+        let mut buffer = TextBuffer::from_string("🦀é".to_string());
+        buffer.set_cursor_position(1).unwrap(); // After crab emoji
+
+        buffer.insert_char_at_position(0, 'A');
+        assert_eq!(buffer.get_content(), "A🦀é");
+        assert_eq!(buffer.get_cursor_position(), 2); // Cursor moved right
+
+        buffer.delete_char_at_position(0); // Delete 'A'
+        assert_eq!(buffer.get_content(), "🦀é");
+        assert_eq!(buffer.get_cursor_position(), 1); // Cursor moved left
     }
 }
