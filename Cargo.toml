@@ -6,8 +6,11 @@ edition = "2024"
 [dependencies]
 crossterm = "0.29.0"
 ropey = "1.6.1"
+serde = { version = "1.0.219", features = ["derive"] }
+tokio = { version = "1.46.0", features = ["full"] }
 tree-sitter = "0.25.6"
 tree-sitter-rust = "0.24.0"
+uuid = { version = "1.17.0", features = ["v4"] }
 
 [build-dependencies]
 cc = "1.2.27"
