@@ -1,6 +1,7 @@
 use ropey::Rope;
 use std::cmp::min;
 use std::hash::{DefaultHasher, Hash, Hasher};
+use crate::server::events::EditMode;
 
 pub struct TextBuffer {
     content: Rope,
@@ -9,6 +10,7 @@ pub struct TextBuffer {
     original_cursor_position: usize,
     cursor_position: usize,
     content_hash: u64,
+    edit_mode: EditMode
 }
 
 impl TextBuffer {
@@ -22,6 +24,7 @@ impl TextBuffer {
             original_cursor_position: 0,
             cursor_position: 0,
             content_hash,
+            edit_mode: EditMode::Normal,
         }
     }
 
@@ -36,6 +39,7 @@ impl TextBuffer {
             original_content: content,
             original_content_hash: content_hash,
             content_hash,
+            edit_mode: EditMode::Normal,
         }
     }
 
@@ -191,6 +195,15 @@ impl TextBuffer {
         self.cursor_position = self.original_cursor_position;
         self.content_hash = Self::hash_rope(&self.content);
     }
+
+    pub fn get_edit_mode(&self) -> EditMode {
+        self.edit_mode.clone()
+    }
+
+    pub fn set_edit_mode(&mut self, mode: EditMode) {
+        self.edit_mode = mode;
+    }
+
 }
 
 #[cfg(test)]

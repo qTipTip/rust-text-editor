@@ -18,12 +18,22 @@ impl EditorServer {
             buffer_owners: HashMap::new(),
         }
     }
-    pub async fn set_edit_mode(&self, buffer_id: BufferId, mode: EditMode) -> ServerResult<()> {
-        todo!()
+    pub async fn set_edit_mode(&mut self, buffer_id: BufferId, mode: EditMode) -> ServerResult<()> {
+        match self.buffers.get_mut(&buffer_id) {
+            Some(buffer) => {
+                Ok(buffer.set_edit_mode(mode))
+            }
+            _ => Err(BufferNotFound)
+        }
     }
 
     pub async fn get_edit_mode(&self, buffer_id: BufferId) -> ServerResult<EditMode> {
-        todo!()
+        match self.buffers.get(&buffer_id) {
+            Some(buffer) => {
+                Ok(buffer.get_edit_mode())
+            }
+            _ => Err(BufferNotFound)
+        }
     }
 
     pub async fn get_client_events(&self, client_id: ClientId) -> ServerResult<Vec<EditorEvent>> {
