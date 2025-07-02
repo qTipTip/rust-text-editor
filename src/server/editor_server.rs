@@ -1,8 +1,10 @@
 use crate::server::client::Client;
-use crate::server::events::{BufferId, ClientId, EditMode, EditorEvent, ServerError, ServerResult};
+use crate::server::events::ServerError::{BufferNotFound, ClientNotFound};
+use crate::server::events::{
+    BufferId, ClientId, EditMode, EditorEvent, ServerError, ServerResult, TextChange,
+};
 use crate::text_buffer::TextBuffer;
 use std::collections::HashMap;
-use crate::server::events::ServerError::BufferNotFound;
 
 pub struct EditorServer {
     clients: HashMap<ClientId, Client>,
@@ -21,31 +23,71 @@ impl EditorServer {
     pub async fn set_edit_mode(&mut self, buffer_id: BufferId, mode: EditMode) -> ServerResult<()> {
         match self.buffers.get_mut(&buffer_id) {
             Some(buffer) => {
-                Ok(buffer.set_edit_mode(mode))
-            }
-            _ => Err(BufferNotFound)
+                buffer.set_edit_mode(mode.clone());
+
+                let event = EditorEvent::ModeChanged {
+                    buffer_id,
+                    mode,
+                };
+                self.broadcast_event_to_buffer(buffer_id, event).await;
+                Ok(())
+            },
+
+            _ => Err(BufferNotFound),
         }
     }
 
     pub async fn get_edit_mode(&self, buffer_id: BufferId) -> ServerResult<EditMode> {
         match self.buffers.get(&buffer_id) {
-            Some(buffer) => {
-                Ok(buffer.get_edit_mode())
-            }
-            _ => Err(BufferNotFound)
+            Some(buffer) => Ok(buffer.get_edit_mode()),
+            _ => Err(BufferNotFound),
         }
     }
 
-    pub async fn get_client_events(&self, client_id: ClientId) -> ServerResult<Vec<EditorEvent>> {
-        todo!()
+    pub async fn get_client_events(
+        &mut self,
+        client_id: ClientId,
+    ) -> ServerResult<Vec<EditorEvent>> {
+        let client = match self.clients.get_mut(&client_id) {
+            None => return Err(ClientNotFound),
+            Some(client) => client,
+        };
+
+        Ok(client.get_event_queue())
     }
 
     pub async fn subscribe_to_buffer(
-        &self,
+        &mut self,
         client_id: ClientId,
         buffer_id: BufferId,
     ) -> ServerResult<()> {
-        todo!()
+        let client = match self.clients.get_mut(&client_id) {
+            None => return Err(ClientNotFound),
+            Some(client) => client,
+        };
+
+        match self.buffers.get_mut(&buffer_id) {
+            None => return Err(BufferNotFound),
+            _ => {}
+        };
+
+        client.subscribe_to_buffer(buffer_id);
+        Ok(())
+    }
+
+    pub async fn broadcast_event_to_buffer(
+        &mut self,
+        buffer_id: BufferId,
+        event: EditorEvent,
+    ) -> ServerResult<()> {
+
+        for (client_id, client) in self.clients.iter_mut() {
+            if client.is_subscribed_to_buffer(buffer_id) {
+                client.push_to_event_queue(event.clone())
+            }
+        }
+
+        Ok(())
     }
 
     pub async fn move_cursor_left(&mut self, buffer_id: BufferId) -> ServerResult<()> {
@@ -64,13 +106,12 @@ impl EditorServer {
                 buffer.move_cursor_right();
                 Ok(())
             }
-        }    }
+        }
+    }
     pub async fn get_cursor_position(&self, buffer_id: BufferId) -> ServerResult<usize> {
         match self.buffers.get(&buffer_id) {
             None => Err(BufferNotFound),
-            Some(buffer) => {
-                Ok(buffer.get_cursor_position())
-            }
+            Some(buffer) => Ok(buffer.get_cursor_position()),
         }
     }
 
@@ -88,11 +129,26 @@ impl EditorServer {
         }
     }
 
-    pub async fn delete_char(&mut self, buffer_id: BufferId, position: i32) -> ServerResult<()> {
+    pub async fn delete_char(&mut self, buffer_id: BufferId, position: usize) -> ServerResult<()> {
         match self.buffers.get_mut(&buffer_id) {
             None => Err(ServerError::BufferNotFound),
             Some(buffer) => {
-                buffer.delete_char_at_position(position as usize);
+                let ch = buffer
+                    .delete_char_at_position(position)
+                    .map_err(|_| ServerError::InvalidOperation)?;
+
+                let change = TextChange {
+                    position,
+                    deleted_text: ch.to_string(),
+                    inserted_text: "".to_string(),
+                };
+
+                let event = EditorEvent::BufferChanged {
+                    buffer_id,
+                    changes: vec![change],
+                };
+
+                self.broadcast_event_to_buffer(buffer_id, event).await;
                 Ok(())
             }
         }
@@ -100,13 +156,27 @@ impl EditorServer {
     pub async fn insert_char(
         &mut self,
         buffer_id: BufferId,
-        position: i32,
+        position: usize,
         ch: char,
     ) -> ServerResult<()> {
         match self.buffers.get_mut(&buffer_id) {
             None => Err(ServerError::BufferNotFound),
             Some(buffer) => {
                 buffer.insert_char_at_position(position as usize, ch);
+
+                let change = TextChange {
+                    position,
+                    deleted_text: "".to_string(),
+                    inserted_text: ch.to_string(),
+                };
+
+                let event = EditorEvent::BufferChanged {
+                    buffer_id,
+                    changes: vec![change],
+                };
+
+                self.broadcast_event_to_buffer(buffer_id, event).await;
+
                 Ok(())
             }
         }
@@ -127,11 +197,8 @@ impl EditorServer {
         content: Option<String>,
     ) -> ServerResult<BufferId> {
         let client = match self.clients.get(&client_id) {
-            None => {
-                return Err(BufferNotFound)
-
-            },
-            Some(client) => client
+            None => return Err(BufferNotFound),
+            Some(client) => client,
         };
 
         let buffer = match content {
@@ -154,10 +221,11 @@ impl EditorServer {
         match self.clients.remove(&client_id) {
             None => Err(ServerError::ClientNotFound),
             Some(_) => {
-                let buffers_owned_by_client: Vec<BufferId> = self.buffer_owners
+                let buffers_owned_by_client: Vec<BufferId> = self
+                    .buffer_owners
                     .iter()
-                    .filter(|(_, owner) | **owner == client_id)
-                    .map(|(&buffer_id, _)|buffer_id)
+                    .filter(|(_, owner)| **owner == client_id)
+                    .map(|(&buffer_id, _)| buffer_id)
                     .collect();
 
                 for buffer_id in buffers_owned_by_client {
@@ -166,7 +234,7 @@ impl EditorServer {
                 }
 
                 Ok(())
-            },
+            }
         }
     }
 

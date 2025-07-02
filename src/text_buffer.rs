@@ -71,18 +71,19 @@ impl TextBuffer {
         }
     }
 
-    pub fn delete_char_at_position(&mut self, position: usize) -> Result<(), String> {
+    pub fn delete_char_at_position(&mut self, position: usize) -> Result<char, String> {
         if position >= self.content.len_chars() {
-            return Err("Attempting to delete char at position out of bounds".to_string());
+            return Err("Position out of bounds".to_string());
         }
 
+        let deleted_char = self.content.char(position);
         self.content.remove(position..position + 1);
 
-        // If we delete at cursor position or to the left, we keep the cursor where it is to the left.
         if position < self.cursor_position {
-            self.move_cursor_left();
+            self.cursor_position -= 1;
         }
-        Ok(())
+
+        Ok(deleted_char)
     }
     pub fn insert_char(&mut self, ch: char) {
         self.content.insert_char(self.cursor_position, ch);
