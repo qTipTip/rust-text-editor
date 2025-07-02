@@ -2,6 +2,7 @@ use crate::server::client::Client;
 use crate::server::events::{BufferId, ClientId, EditMode, EditorEvent, ServerError, ServerResult};
 use crate::text_buffer::TextBuffer;
 use std::collections::HashMap;
+use crate::server::events::ServerError::BufferNotFound;
 
 pub struct EditorServer {
     clients: HashMap<ClientId, Client>,
@@ -35,22 +36,44 @@ impl EditorServer {
         todo!()
     }
 
-    pub async fn move_cursor_left(&self, buffer_id: BufferId) -> ServerResult<()> {
-        todo!()
+    pub async fn move_cursor_left(&mut self, buffer_id: BufferId) -> ServerResult<()> {
+        match self.buffers.get_mut(&buffer_id) {
+            None => Err(BufferNotFound),
+            Some(buffer) => {
+                buffer.move_cursor_left();
+                Ok(())
+            }
+        }
     }
-    pub async fn move_cursor_right(&self, buffer_id: BufferId) -> ServerResult<()> {
-        todo!()
-    }
+    pub async fn move_cursor_right(&mut self, buffer_id: BufferId) -> ServerResult<()> {
+        match self.buffers.get_mut(&buffer_id) {
+            None => Err(BufferNotFound),
+            Some(buffer) => {
+                buffer.move_cursor_right();
+                Ok(())
+            }
+        }    }
     pub async fn get_cursor_position(&self, buffer_id: BufferId) -> ServerResult<usize> {
-        todo!()
+        match self.buffers.get(&buffer_id) {
+            None => Err(BufferNotFound),
+            Some(buffer) => {
+                Ok(buffer.get_cursor_position())
+            }
+        }
     }
 
     pub async fn set_cursor_position(
-        &self,
+        &mut self,
         buffer_id: BufferId,
         position: i32,
     ) -> ServerResult<()> {
-        todo!()
+        match self.buffers.get_mut(&buffer_id) {
+            None => Err(BufferNotFound),
+            Some(buffer) => {
+                buffer.set_cursor_position(position as usize);
+                Ok(())
+            }
+        }
     }
 
     pub async fn delete_char(&mut self, buffer_id: BufferId, position: i32) -> ServerResult<()> {
