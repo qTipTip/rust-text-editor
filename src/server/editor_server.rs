@@ -7,6 +7,7 @@ use crate::server::events::ServerError::BufferNotFound;
 pub struct EditorServer {
     clients: HashMap<ClientId, Client>,
     buffers: HashMap<BufferId, TextBuffer>,
+    buffer_owners: HashMap<BufferId, ClientId>, // One client owner per buffer
 }
 
 impl EditorServer {
@@ -14,6 +15,7 @@ impl EditorServer {
         Self {
             clients: HashMap::new(),
             buffers: HashMap::new(),
+            buffer_owners: HashMap::new(),
         }
     }
     pub async fn set_edit_mode(&self, buffer_id: BufferId, mode: EditMode) -> ServerResult<()> {
@@ -114,6 +116,14 @@ impl EditorServer {
         client_id: ClientId,
         content: Option<String>,
     ) -> ServerResult<BufferId> {
+        let client = match self.clients.get(&client_id) {
+            None => {
+                return Err(BufferNotFound)
+
+            },
+            Some(client) => client
+        };
+
         let buffer = match content {
             None => TextBuffer::new(),
             Some(content) => TextBuffer::from_string(content),
@@ -121,6 +131,7 @@ impl EditorServer {
 
         let buffer_id = BufferId::new();
         self.buffers.insert(buffer_id, buffer);
+        self.buffer_owners.insert(buffer_id, client_id);
 
         Ok(buffer_id)
     }
@@ -132,7 +143,20 @@ impl EditorServer {
     pub async fn disconnect_client(&mut self, client_id: ClientId) -> ServerResult<()> {
         match self.clients.remove(&client_id) {
             None => Err(ServerError::ClientNotFound),
-            Some(_) => Ok(()),
+            Some(_) => {
+                let buffers_owned_by_client: Vec<BufferId> = self.buffer_owners
+                    .iter()
+                    .filter(|(_, owner) | **owner == client_id)
+                    .map(|(&buffer_id, _)|buffer_id)
+                    .collect();
+
+                for buffer_id in buffers_owned_by_client {
+                    self.buffers.remove(&buffer_id);
+                    self.buffer_owners.remove(&buffer_id);
+                }
+
+                Ok(())
+            },
         }
     }
 
