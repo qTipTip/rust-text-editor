@@ -118,9 +118,9 @@ impl TextBuffer {
             let col_in_line = self.cursor_position - current_line_start;
 
             let prev_line_start = self.content.line_to_char(line_idx - 1);
-            let prev_line_len = self.content.line(line_idx - 1).len_chars();
+            let prev_line_visible_len = self.get_line_visible_length(line_idx-1);
 
-            self.cursor_position = prev_line_start + min(col_in_line, prev_line_len);
+            self.cursor_position = prev_line_start + min(col_in_line, prev_line_visible_len);
         }
     }
 
@@ -135,9 +135,9 @@ impl TextBuffer {
             let col_in_line = self.cursor_position - current_line_start;
 
             let prev_line_start = self.content.line_to_char(line_idx + 1);
-            let prev_line_len = self.content.line(line_idx + 1).len_chars();
+            let prev_line_visible_len = self.get_line_visible_length(line_idx + 1);
 
-            self.cursor_position = prev_line_start + min(col_in_line, prev_line_len);
+            self.cursor_position = prev_line_start + min(col_in_line, prev_line_visible_len);
         }
     }
 
@@ -203,6 +203,19 @@ impl TextBuffer {
 
     pub fn set_edit_mode(&mut self, mode: EditMode) {
         self.edit_mode = mode;
+    }
+
+    fn get_line_visible_length(&self, line_idx: usize) -> usize {
+        if line_idx >= self.content.len_lines() {
+            return 0;
+        }
+
+        let line = self.content.line(line_idx);
+        if line.len_chars() > 0 && line.char(line.len_chars() - 1) == '\n' {
+            line.len_chars() - 1  // Exclude newline
+        } else {
+            line.len_chars()  // Last line has no newline
+        }
     }
 
 }
@@ -541,5 +554,13 @@ mod tests {
         assert_eq!(buffer.get_content(), "🦀é");
         assert_eq!(buffer.get_cursor_position(), 1); // Cursor moved left
     }
-    
+
+    #[test]
+    fn test_line_visible_length() {
+        let buffer = TextBuffer::from_string("hello\nworld\ntest".to_string());
+
+        assert_eq!(buffer.get_line_visible_length(0), 5); // "hello" (no newline counted)
+        assert_eq!(buffer.get_line_visible_length(1), 5); // "world" (no newline counted)
+        assert_eq!(buffer.get_line_visible_length(2), 4); // "test" (last line, no newline)
+    }
 }

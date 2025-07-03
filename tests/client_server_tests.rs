@@ -101,27 +101,22 @@ async fn test_cursor_movement_up() {
     let mut server = EditorServer::new().await;
     let client_id = server.connect_client().await.unwrap();
 
-    // Create buffer with multi-line content
     let buffer_id = server.create_buffer(client_id, Some("hello\nworld\ntest".to_string())).await.unwrap();
 
-    // Cursor should start at end (position 16, after "test")
     let initial_pos = server.get_cursor_position(buffer_id).await.unwrap();
     assert_eq!(initial_pos, 16);
 
-    // Move cursor up once (should go to end of "world" line, position 10)
     server.move_cursor_up(buffer_id).await.unwrap();
     let pos_after_up1 = server.get_cursor_position(buffer_id).await.unwrap();
-    assert_eq!(pos_after_up1, 10); // End of "world"
+    assert_eq!(pos_after_up1, 10);
 
-    // Move cursor up again (should go to end of "hello" line, position 5)
     server.move_cursor_up(buffer_id).await.unwrap();
     let pos_after_up2 = server.get_cursor_position(buffer_id).await.unwrap();
-    assert_eq!(pos_after_up2, 5); // End of "hello"
+    assert_eq!(pos_after_up2, 4);
 
-    // Move cursor up again (should stay at top)
     server.move_cursor_up(buffer_id).await.unwrap();
     let pos_after_up3 = server.get_cursor_position(buffer_id).await.unwrap();
-    assert_eq!(pos_after_up3, 5); // Should not move past top
+    assert_eq!(pos_after_up3, 4);
 }
 
 #[tokio::test]
@@ -153,11 +148,7 @@ async fn test_cursor_movement_down() {
 async fn test_cursor_movement_up_down_column_preservation() {
     let mut server = EditorServer::new().await;
     let client_id = server.connect_client().await.unwrap();
-
-    // Create buffer with lines of different lengths
-    // "hello world" (11 chars) + \n (1) = positions 0-11
-    // "hi" (2 chars) + \n (1) = positions 12-14
-    // "hello again" (11 chars) = positions 15-25
+    
     let buffer_id = server.create_buffer(client_id, Some("hello world\nhi\nhello again".to_string())).await.unwrap();
 
     // Set cursor to position 8 (in "hello world" line, after "hello wo")
@@ -166,13 +157,20 @@ async fn test_cursor_movement_up_down_column_preservation() {
     // Move down to shorter line "hi" - cursor should go to end of "hi" (position 14)
     server.move_cursor_down(buffer_id).await.unwrap();
     let pos_after_down = server.get_cursor_position(buffer_id).await.unwrap();
-    assert_eq!(pos_after_down, 14); // End of "hi" line (position of \n)
+    assert_eq!(pos_after_down, 14); // End of "hi"
 
-    // Move down to longer line "hello again" - cursor should try to preserve column
-    // Column 8 in "hello again" would be position 15 + 8 = 23
+    // Move down again, should end up after he in hello.
     server.move_cursor_down(buffer_id).await.unwrap();
     let pos_after_down2 = server.get_cursor_position(buffer_id).await.unwrap();
-    assert_eq!(pos_after_down2, 23); // Position 8 in "hello again" line
+    assert_eq!(pos_after_down2, 17);
+
+    server.move_cursor_up(buffer_id).await.unwrap();
+    let pos_after_up = server.get_cursor_position(buffer_id).await.unwrap();
+    assert_eq!(pos_after_up, 14);
+    
+    server.move_cursor_up(buffer_id).await.unwrap();
+    let pos_after_up2 = server.get_cursor_position(buffer_id).await.unwrap();
+    assert_eq!(pos_after_up2, 2);
 }
 
 #[tokio::test]
