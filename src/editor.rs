@@ -4,6 +4,7 @@ use crate::server::events::{BufferId, EditMode};
 use crate::server::server_client::Client;
 use std::fs::read_to_string;
 use std::path::PathBuf;
+use ropey::str_utils::char_to_byte_idx;
 
 #[derive(Debug)]
 pub enum EditorError {
@@ -279,10 +280,30 @@ impl Editor {
     }
 
     pub async fn get_visible_lines(&self) -> EditorResult<Vec<String>> {
-        todo!()
+        let buffer_id = self.current_buffer_id.ok_or(NoActiveBuffer)?;
+        let content = self.client.get_content(buffer_id).await?;
+
+        let lines: Vec<&str> = content.lines().collect();
+        let visible_lines = lines
+            .iter()
+            .skip(self.scroll_offset)
+            .take(self.viewport_size)
+            .map(|s| s.to_string())
+            .collect();
+
+        Ok(visible_lines)
+
     }
     pub async fn get_status_line_info(&self) -> EditorResult<String> {
-        todo!()
+        let (row, col) = self.get_cursor_display_position().await.unwrap();
+        let current_mode = match self.get_current_mode().await? {
+            EditMode::Normal => "NORMAL",
+            EditMode::Insert => "INSERT",
+            EditMode::Visual => "VISUAL",
+            EditMode::Command => "COMMAND",
+        };
+        let status = self.get_status_message();
+        Ok(format!("Cursor: ({}:{}) | Mode: {:?} | Status: {}", row + 1, col + 1, current_mode, status ))
     }
     pub async fn update_scroll_for_cursor(&mut self) -> EditorResult<()> {
         // Make sure the scroll-offset is modified to accommodate the cursor display positon.
@@ -303,21 +324,32 @@ impl Editor {
 
     // Input handling
     pub async fn handle_normal_mode_key(&mut self, key: char) -> EditorResult<()> {
-        todo!()
+        match key {
+            'i' => self.enter_insert_mode().await?,
+            'v' => self.enter_visual_mode().await?,
+            'k' => self.move_cursor_up().await?,
+            'l' => self.move_cursor_right().await?,
+            'h' => self.move_cursor_left().await?,
+            'j' => self.move_cursor_down().await?,
+            _ => {}
+        }
+
+        Ok(())
     }
     pub async fn handle_insert_mode_char(&mut self, ch: char) -> EditorResult<()> {
-        todo!()
+        Ok(self.insert_char_at_cursor(ch).await?)
     }
     pub async fn handle_insert_mode_backspace(&mut self) -> EditorResult<()> {
-        todo!()
+        self.move_cursor_left().await?;
+        Ok(self.delete_char_at_cursor().await?)
     }
     pub async fn handle_insert_mode_escape(&mut self) -> EditorResult<()> {
-        todo!()
+        Ok(self.enter_normal_mode().await?)
     }
 
     // Utility methods
     pub fn mark_as_saved(&mut self) {
-        todo!()
+        self.is_modified = false;
     }
     pub async fn get_cursor_viewport_position(&self) -> EditorResult<(usize, usize)> {
         todo!()
