@@ -1,4 +1,3 @@
-use crate::server::client::Client;
 use crate::server::editor_server::EditorServer;
 use crate::server::events::{BufferId, ClientId, EditMode, ServerError};
 

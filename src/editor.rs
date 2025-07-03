@@ -1,7 +1,6 @@
-use crate::server::events::{BufferId, EditMode};
-use crate::server::{BufferId, EditMode};
-use rust_text_editor::client::editor_client::{ClientError, EditorClient};
 use std::path::PathBuf;
+use crate::{ClientError, EditorClient};
+use crate::server::events::{BufferId, EditMode};
 
 #[derive(Debug)]
 pub enum EditorError {
