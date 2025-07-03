@@ -12,6 +12,7 @@ pub struct EditorServer {
     buffer_owners: HashMap<BufferId, ClientId>, // One client owner per buffer
 }
 
+
 impl EditorServer {
     pub async fn new() -> Self {
         Self {
@@ -108,6 +109,26 @@ impl EditorServer {
             }
         }
     }
+
+    pub async fn move_cursor_up(&mut self, buffer_id: BufferId) -> ServerResult<()> {
+        match self.buffers.get_mut(&buffer_id) {
+            None => Err(BufferNotFound),
+            Some(buffer) => {
+                buffer.move_cursor_up();
+                Ok(())
+            }
+        }
+    }
+
+    pub async fn move_cursor_down(&mut self, buffer_id: BufferId) -> ServerResult<()> {
+        match self.buffers.get_mut(&buffer_id) {
+            None => Err(BufferNotFound),
+            Some(buffer) => {
+                buffer.move_cursor_down();
+                Ok(())
+            }
+        }
+    }
     pub async fn get_cursor_position(&self, buffer_id: BufferId) -> ServerResult<usize> {
         match self.buffers.get(&buffer_id) {
             None => Err(BufferNotFound),
@@ -118,12 +139,12 @@ impl EditorServer {
     pub async fn set_cursor_position(
         &mut self,
         buffer_id: BufferId,
-        position: i32,
+        position: usize,
     ) -> ServerResult<()> {
         match self.buffers.get_mut(&buffer_id) {
             None => Err(BufferNotFound),
             Some(buffer) => {
-                buffer.set_cursor_position(position as usize);
+                buffer.set_cursor_position(position);
                 Ok(())
             }
         }

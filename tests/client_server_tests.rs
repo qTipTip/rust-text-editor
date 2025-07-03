@@ -91,6 +91,188 @@ async fn test_cursor_operations() {
     assert_eq!(pos, 3);
 }
 
+// Add these tests to your existing tests/client_server_tests.rs file
+// Or create a new test file: tests/server_cursor_tests.rs
+
+use rust_text_editor::server::*;
+
+#[tokio::test]
+async fn test_cursor_movement_up() {
+    let mut server = EditorServer::new().await;
+    let client_id = server.connect_client().await.unwrap();
+
+    // Create buffer with multi-line content
+    let buffer_id = server.create_buffer(client_id, Some("hello\nworld\ntest".to_string())).await.unwrap();
+
+    // Cursor should start at end (position 16, after "test")
+    let initial_pos = server.get_cursor_position(buffer_id).await.unwrap();
+    assert_eq!(initial_pos, 16);
+
+    // Move cursor up once (should go to end of "world" line, position 10)
+    server.move_cursor_up(buffer_id).await.unwrap();
+    let pos_after_up1 = server.get_cursor_position(buffer_id).await.unwrap();
+    assert_eq!(pos_after_up1, 10); // End of "world"
+
+    // Move cursor up again (should go to end of "hello" line, position 5)
+    server.move_cursor_up(buffer_id).await.unwrap();
+    let pos_after_up2 = server.get_cursor_position(buffer_id).await.unwrap();
+    assert_eq!(pos_after_up2, 5); // End of "hello"
+
+    // Move cursor up again (should stay at top)
+    server.move_cursor_up(buffer_id).await.unwrap();
+    let pos_after_up3 = server.get_cursor_position(buffer_id).await.unwrap();
+    assert_eq!(pos_after_up3, 5); // Should not move past top
+}
+
+#[tokio::test]
+async fn test_cursor_movement_down() {
+    let mut server = EditorServer::new().await;
+    let client_id = server.connect_client().await.unwrap();
+
+    // Create buffer with multi-line content and set cursor to beginning
+    let buffer_id = server.create_buffer(client_id, Some("hello\nworld\ntest".to_string())).await.unwrap();
+    server.set_cursor_position(buffer_id, 0).await.unwrap(); // Start at beginning
+
+    // Move cursor down once (should go to start of "world" line, position 6)
+    server.move_cursor_down(buffer_id).await.unwrap();
+    let pos_after_down1 = server.get_cursor_position(buffer_id).await.unwrap();
+    assert_eq!(pos_after_down1, 6); // Start of "world" line
+
+    // Move cursor down again (should go to start of "test" line, position 12)
+    server.move_cursor_down(buffer_id).await.unwrap();
+    let pos_after_down2 = server.get_cursor_position(buffer_id).await.unwrap();
+    assert_eq!(pos_after_down2, 12); // Start of "test" line
+
+    // Move cursor down again (should stay at bottom)
+    server.move_cursor_down(buffer_id).await.unwrap();
+    let pos_after_down3 = server.get_cursor_position(buffer_id).await.unwrap();
+    assert_eq!(pos_after_down3, 12); // Should not move past bottom
+}
+
+#[tokio::test]
+async fn test_cursor_movement_up_down_column_preservation() {
+    let mut server = EditorServer::new().await;
+    let client_id = server.connect_client().await.unwrap();
+
+    // Create buffer with lines of different lengths
+    // "hello world" (11 chars) + \n (1) = positions 0-11
+    // "hi" (2 chars) + \n (1) = positions 12-14
+    // "hello again" (11 chars) = positions 15-25
+    let buffer_id = server.create_buffer(client_id, Some("hello world\nhi\nhello again".to_string())).await.unwrap();
+
+    // Set cursor to position 8 (in "hello world" line, after "hello wo")
+    server.set_cursor_position(buffer_id, 8).await.unwrap();
+
+    // Move down to shorter line "hi" - cursor should go to end of "hi" (position 14)
+    server.move_cursor_down(buffer_id).await.unwrap();
+    let pos_after_down = server.get_cursor_position(buffer_id).await.unwrap();
+    assert_eq!(pos_after_down, 14); // End of "hi" line (position of \n)
+
+    // Move down to longer line "hello again" - cursor should try to preserve column
+    // Column 8 in "hello again" would be position 15 + 8 = 23
+    server.move_cursor_down(buffer_id).await.unwrap();
+    let pos_after_down2 = server.get_cursor_position(buffer_id).await.unwrap();
+    assert_eq!(pos_after_down2, 23); // Position 8 in "hello again" line
+}
+
+#[tokio::test]
+async fn test_cursor_movement_single_line() {
+    let mut server = EditorServer::new().await;
+    let client_id = server.connect_client().await.unwrap();
+
+    // Create buffer with single line
+    let buffer_id = server.create_buffer(client_id, Some("single line".to_string())).await.unwrap();
+
+    // Set cursor to middle
+    server.set_cursor_position(buffer_id, 5).await.unwrap();
+    let initial_pos = server.get_cursor_position(buffer_id).await.unwrap();
+
+    // Moving up/down on single line should not change position
+    server.move_cursor_up(buffer_id).await.unwrap();
+    let pos_after_up = server.get_cursor_position(buffer_id).await.unwrap();
+    assert_eq!(pos_after_up, initial_pos);
+
+    server.move_cursor_down(buffer_id).await.unwrap();
+    let pos_after_down = server.get_cursor_position(buffer_id).await.unwrap();
+    assert_eq!(pos_after_down, initial_pos);
+}
+
+#[tokio::test]
+async fn test_cursor_movement_empty_buffer() {
+    let mut server = EditorServer::new().await;
+    let client_id = server.connect_client().await.unwrap();
+
+    // Create empty buffer
+    let buffer_id = server.create_buffer(client_id, None).await.unwrap();
+
+    // Cursor should start at 0
+    let initial_pos = server.get_cursor_position(buffer_id).await.unwrap();
+    assert_eq!(initial_pos, 0);
+
+    // Moving up/down on empty buffer should not change position
+    server.move_cursor_up(buffer_id).await.unwrap();
+    let pos_after_up = server.get_cursor_position(buffer_id).await.unwrap();
+    assert_eq!(pos_after_up, 0);
+
+    server.move_cursor_down(buffer_id).await.unwrap();
+    let pos_after_down = server.get_cursor_position(buffer_id).await.unwrap();
+    assert_eq!(pos_after_down, 0);
+}
+
+#[tokio::test]
+async fn test_cursor_movement_error_handling() {
+    let mut server = EditorServer::new().await;
+    let client_id = server.connect_client().await.unwrap();
+
+    // Try to move cursor on non-existent buffer
+    let fake_buffer_id = BufferId::new();
+    assert!(server.move_cursor_up(fake_buffer_id).await.is_err());
+    assert!(server.move_cursor_down(fake_buffer_id).await.is_err());
+}
+
+#[tokio::test]
+async fn test_all_cursor_movements_together() {
+    let mut server = EditorServer::new().await;
+    let client_id = server.connect_client().await.unwrap();
+
+    // Create a 3x3 grid of text
+    let buffer_id = server.create_buffer(client_id, Some("abc\ndef\nghi".to_string())).await.unwrap();
+
+    // Start at beginning (position 0, should be 'a')
+    server.set_cursor_position(buffer_id, 0).await.unwrap();
+
+    // Move right twice to 'c'
+    server.move_cursor_right(buffer_id).await.unwrap();
+    server.move_cursor_right(buffer_id).await.unwrap();
+    let pos = server.get_cursor_position(buffer_id).await.unwrap();
+    assert_eq!(pos, 2); // At 'c'
+
+    // Move down to 'f'
+    server.move_cursor_down(buffer_id).await.unwrap();
+    let pos = server.get_cursor_position(buffer_id).await.unwrap();
+    assert_eq!(pos, 6); // At 'f'
+
+    // Move down to 'i'
+    server.move_cursor_down(buffer_id).await.unwrap();
+    let pos = server.get_cursor_position(buffer_id).await.unwrap();
+    assert_eq!(pos, 10); // At 'i'
+
+    // Move left to 'h'
+    server.move_cursor_left(buffer_id).await.unwrap();
+    let pos = server.get_cursor_position(buffer_id).await.unwrap();
+    assert_eq!(pos, 9); // At 'h'
+
+    // Move up to 'e'
+    server.move_cursor_up(buffer_id).await.unwrap();
+    let pos = server.get_cursor_position(buffer_id).await.unwrap();
+    assert_eq!(pos, 5); // At 'e'
+
+    // Move up to 'b'
+    server.move_cursor_up(buffer_id).await.unwrap();
+    let pos = server.get_cursor_position(buffer_id).await.unwrap();
+    assert_eq!(pos, 1); // At 'b'
+}
+
 #[tokio::test]
 async fn test_event_broadcasting() {
     let mut server = EditorServer::new().await;

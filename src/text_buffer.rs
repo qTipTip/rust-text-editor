@@ -541,4 +541,5 @@ mod tests {
         assert_eq!(buffer.get_content(), "🦀é");
         assert_eq!(buffer.get_cursor_position(), 1); // Cursor moved left
     }
+    
 }

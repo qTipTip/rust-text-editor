@@ -50,18 +50,15 @@ impl EditorClient {
         position: usize,
         ch: char,
     ) -> ClientResult<()> {
-        // Your implementation here
-        todo!()
+        Ok(self.server.insert_char(buffer_id, position, ch).await?)
     }
 
     pub async fn delete_char(&mut self, buffer_id: BufferId, position: usize) -> ClientResult<()> {
-        // Your implementation here
-        todo!()
+        Ok(self.server.delete_char(buffer_id, position).await?)
     }
 
     pub async fn get_cursor_position(&self, buffer_id: BufferId) -> ClientResult<usize> {
-        // Your implementation here
-        todo!()
+        Ok(self.server.get_cursor_position(buffer_id).await?)
     }
 
     pub async fn set_cursor_position(
@@ -69,23 +66,31 @@ impl EditorClient {
         buffer_id: BufferId,
         position: usize,
     ) -> ClientResult<()> {
-        // Your implementation here
-        todo!()
+        Ok(self.server.set_cursor_position(buffer_id, position).await?)
     }
 
     pub async fn move_cursor_right(&mut self, buffer_id: BufferId) -> ClientResult<()> {
-        // Your implementation here
-        todo!()
+        Ok(self.server.move_cursor_right(buffer_id).await?)
     }
 
-    pub async fn get_mode(&self, buffer_id: BufferId) -> ClientResult<EditMode> {
-        // Your implementation here
-        todo!()
+    pub async fn move_cursor_left(&mut self, buffer_id: BufferId) -> ClientResult<()> {
+        Ok(self.server.move_cursor_left(buffer_id).await?)
+    }
+
+    pub async fn move_cursor_up(&mut self, buffer_id: BufferId) -> ClientResult<()> {
+        Ok(self.server.move_cursor_up(buffer_id).await?)
+    }
+
+    pub async fn move_cursor_down(&mut self, buffer_id: BufferId) -> ClientResult<()> {
+        Ok(self.server.move_cursor_down(buffer_id).await?)
     }
 
     pub async fn set_mode(&mut self, buffer_id: BufferId, mode: EditMode) -> ClientResult<()> {
-        // Your implementation here
-        todo!()
+        Ok(self.server.set_edit_mode(buffer_id, mode).await?)
+    }
+
+    pub async fn get_mode(&mut self, buffer_id: BufferId) -> ClientResult<EditMode> {
+        Ok(self.server.get_edit_mode(buffer_id).await?)
     }
 
     pub fn buffer_count(&self) -> usize {
