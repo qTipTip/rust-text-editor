@@ -95,7 +95,7 @@ impl EditorClient {
         Ok(self.server.set_edit_mode(buffer_id, mode).await?)
     }
 
-    pub async fn get_mode(&mut self, buffer_id: BufferId) -> ClientResult<EditMode> {
+    pub async fn get_mode(&self, buffer_id: BufferId) -> ClientResult<EditMode> {
         Ok(self.server.get_edit_mode(buffer_id).await?)
     }
 

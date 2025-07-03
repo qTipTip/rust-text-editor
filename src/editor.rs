@@ -161,19 +161,34 @@ impl Editor {
 
     // Modal operations
     pub async fn get_current_mode(&self) -> EditorResult<EditMode> {
-        todo!()
+        match self.current_buffer_id {
+            None => Err(NoActiveBuffer),
+            Some(buffer_id) => Ok(self.client.get_mode(buffer_id).await?),
+        }
     }
     pub async fn enter_normal_mode(&mut self) -> EditorResult<()> {
-        todo!()
+        match self.current_buffer_id {
+            None => Err(NoActiveBuffer),
+            Some(buffer_id) => Ok(self.client.set_mode(buffer_id, EditMode::Normal).await?),
+        }
     }
     pub async fn enter_insert_mode(&mut self) -> EditorResult<()> {
-        todo!()
+        match self.current_buffer_id {
+            None => Err(NoActiveBuffer),
+            Some(buffer_id) => Ok(self.client.set_mode(buffer_id, EditMode::Insert).await?),
+        }
     }
     pub async fn enter_visual_mode(&mut self) -> EditorResult<()> {
-        todo!()
+        match self.current_buffer_id {
+            None => Err(NoActiveBuffer),
+            Some(buffer_id) => Ok(self.client.set_mode(buffer_id, EditMode::Visual).await?),
+        }
     }
     pub async fn enter_command_mode(&mut self) -> EditorResult<()> {
-        todo!()
+        match self.current_buffer_id {
+            None => Err(NoActiveBuffer),
+            Some(buffer_id) => Ok(self.client.set_mode(buffer_id, EditMode::Command).await?),
+        }
     }
 
     // File operations
