@@ -478,26 +478,6 @@ impl Editor {
             KeyEventKind::Press | KeyEventKind::Repeat => {}
         }
 
-        // Global key bindings (work in any mode)
-        match key_event.code {
-            KeyCode::Char('q') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
-                if self.is_modified {
-                    self.status_message = "File modified! Press Ctrl+Q again to quit without saving, or Ctrl+S to save".to_string();
-                    return Ok(false);
-                }
-                return Ok(true); // Quit
-            }
-            KeyCode::Char('s') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
-                if let Err(e) = self.save().await {
-                    self.status_message = format!("Save failed: {:?}", e);
-                } else if self.current_file.is_none() {
-                    self.status_message = "Use :w filename to save new file".to_string();
-                }
-                return Ok(false);
-            }
-            _ => {}
-        }
-
         // Mode-specific key handling
         let current_mode = self.get_current_mode().await?;
         match current_mode {
@@ -512,21 +492,27 @@ impl Editor {
 
     async fn handle_normal_mode_input(&mut self, key_event: KeyEvent) -> EditorResult<()> {
         match key_event.code {
+
             KeyCode::Char(ch) => {
-                self.handle_normal_mode_key(ch).await?;
-                // Clear status message after successful command
-                if !self.status_message.starts_with("File modified!") {
-                    self.status_message = "".to_string();
+                match ch {
+                    ':' => {
+                        self.enter_command_mode().await?;
+                        self.status_message = ":".to_string();
+                    }
+                    _ => {
+                        self.handle_normal_mode_key(ch).await?;
+                        // Clear status message after successful command
+                        if !self.status_message.starts_with("File modified!") {
+                            self.status_message = "".to_string();
+                        }
+                    }
                 }
             }
+
             KeyCode::Left => self.move_cursor_left().await?,
             KeyCode::Right => self.move_cursor_right().await?,
             KeyCode::Up => self.move_cursor_up().await?,
             KeyCode::Down => self.move_cursor_down().await?,
-            KeyCode::Char(':') => {
-                self.enter_command_mode().await?;
-                self.status_message = ":".to_string();
-            }
             _ => {}
         }
         Ok(())
