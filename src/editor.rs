@@ -1,5 +1,5 @@
 use crate::client::editor_client::{ClientError, EditorClient};
-use crate::editor::EditorError::NoActiveBuffer;
+use crate::editor::EditorError::{IoError, NoActiveBuffer};
 use crate::server::events::{BufferId, EditMode};
 use crate::server::server_client::Client;
 use std::fs::read_to_string;
@@ -11,6 +11,7 @@ pub enum EditorError {
     IoError(std::io::Error),
     NoActiveBuffer,
     BufferNotFound,
+    NoFilePath,
 }
 
 impl From<ClientError> for EditorError {
@@ -98,21 +99,48 @@ impl Editor {
     pub async fn insert_char_at_cursor(&mut self, ch: char) -> EditorResult<()> {
         match self.current_buffer_id {
             None => Err(NoActiveBuffer),
-            Some(buffer_id) => Ok(self
-                .client
-                .insert_char(
-                    buffer_id,
-                    self.client.get_cursor_position(buffer_id).await?,
-                    ch,
-                )
-                .await?),
+            Some(buffer_id) => {
+                self.client
+                    .insert_char(
+                        buffer_id,
+                        self.client.get_cursor_position(buffer_id).await?,
+                        ch,
+                    )
+                    .await?;
+                self.is_modified = true;
+                Ok(())
+            }
         }
     }
     pub async fn delete_char_at_cursor(&mut self) -> EditorResult<()> {
-        todo!()
+        match self.current_buffer_id {
+            None => Err(NoActiveBuffer),
+            Some(buffer_id) => {
+                self.client
+                    .delete_char(buffer_id, self.client.get_cursor_position(buffer_id).await?)
+                    .await?;
+                self.is_modified = true;
+                Ok(())
+            }
+        }
     }
     pub async fn insert_text_at_cursor(&mut self, text: &str) -> EditorResult<()> {
-        todo!()
+        match self.current_buffer_id {
+            None => Err(NoActiveBuffer),
+            Some(buffer_id) => {
+                for ch in text.chars() {
+                    self.client
+                        .insert_char(
+                            buffer_id,
+                            self.client.get_cursor_position(buffer_id).await?,
+                            ch,
+                        )
+                        .await?;
+                }
+                self.is_modified = true;
+                Ok(())
+            }
+        }
     }
 
     // Cursor operations
@@ -196,13 +224,35 @@ impl Editor {
         self.current_file.as_ref()
     }
     pub fn is_modified(&self) -> bool {
-        todo!()
+        self.is_modified
     }
     pub async fn save(&mut self) -> EditorResult<()> {
-        todo!()
+        match (&self.current_file, self.current_buffer_id) {
+            (Some(file_path), Some(buffer_id)) => {
+                let content = self.client.get_content(buffer_id).await?;
+                std::fs::write(file_path, content)?;
+                self.is_modified = false;
+                self.status_message = format!("Saved: {}", file_path.display());
+                Ok(())
+            }
+            (None, Some(_)) => {
+                Err(EditorError::NoFilePath) // Or create a new error variant like NoFilePath
+            }
+            (_, None) => Err(EditorError::NoActiveBuffer),
+        }
     }
     pub async fn save_as(&mut self, path: PathBuf) -> EditorResult<()> {
-        todo!()
+        match self.current_buffer_id {
+            Some(buffer_id) => {
+                let content = self.client.get_content(buffer_id).await?;
+                std::fs::write(&path, content)?;
+                self.current_file = Some(path.clone());
+                self.is_modified = false;
+                self.status_message = format!("Saved as: {}", path.display());
+                Ok(())
+            }
+            None => Err(EditorError::NoActiveBuffer),
+        }
     }
 
     // Display operations
