@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use crate::client::editor_client::{ClientError, EditorClient};
 use crate::server::events::{BufferId, EditMode};
+use crate::server::server_client::Client;
 
 #[derive(Debug)]
 pub enum EditorError {
@@ -37,7 +38,15 @@ pub struct Editor {
 impl Editor {
     // Creation methods
     pub async fn new() -> EditorResult<Self> {
-        todo!()
+        Ok(Self {
+            client: EditorClient::new().await?,
+            current_buffer_id: None,
+            current_file: None,
+            is_modified: false,
+            status_message: "".to_string(),
+            viewport_size: 0,
+            scroll_offset: 0,
+        })
     }
     pub async fn with_content(content: String) -> EditorResult<Self> {
         todo!()
@@ -48,10 +57,10 @@ impl Editor {
 
     // Buffer management
     pub fn current_buffer_id(&self) -> Option<BufferId> {
-        todo!()
+        self.current_buffer_id
     }
     pub fn buffer_count(&self) -> usize {
-        todo!()
+        self.client.buffer_count()
     }
     pub async fn create_new_buffer(&mut self, content: Option<String>) -> EditorResult<BufferId> {
         todo!()
