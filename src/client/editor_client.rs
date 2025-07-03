@@ -67,6 +67,10 @@ impl EditorClient {
     ) -> ClientResult<()> {
         Ok(self.server.set_cursor_position(buffer_id, position).await?)
     }
+    
+    pub async fn get_cursor_display_position(&self, buffer_id: BufferId) -> ClientResult<(usize, usize)> {
+        Ok(self.server.get_cursor_display_position(buffer_id).await?)
+    }
 
     pub async fn move_cursor_right(&mut self, buffer_id: BufferId) -> ClientResult<()> {
         Ok(self.server.move_cursor_right(buffer_id).await?)

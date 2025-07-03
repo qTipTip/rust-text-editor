@@ -113,7 +113,12 @@ impl Editor {
 
     // Cursor operations
     pub async fn get_cursor_position(&self) -> EditorResult<usize> {
-        todo!()
+        match self.current_buffer_id {
+            None => {Err(NoActiveBuffer)}
+            Some(buffer_id) => {
+                Ok(self.client.get_cursor_position(buffer_id).await?)
+            }
+        }
     }
     pub async fn set_cursor_position(&mut self, position: usize) -> EditorResult<()> {
         match self.current_buffer_id {
@@ -122,7 +127,12 @@ impl Editor {
         }
     }
     pub async fn get_cursor_display_position(&self) -> EditorResult<(usize, usize)> {
-        todo!()
+        match self.current_buffer_id {
+            None => {Err(NoActiveBuffer)}
+            Some(buffer_id) => {
+                Ok(self.client.get_cursor_display_position(buffer_id).await?)
+            }
+        }
     }
     pub async fn move_cursor_left(&mut self) -> EditorResult<()> {
         todo!()

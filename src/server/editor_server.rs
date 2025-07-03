@@ -150,6 +150,16 @@ impl EditorServer {
         }
     }
 
+    pub async fn get_cursor_display_position(&self, buffer_id: BufferId) -> ServerResult<(usize, usize)> {
+        match self.buffers.get(&buffer_id) {
+            None => {Err(BufferNotFound)},
+            Some(buffer) => {
+                Ok(buffer.get_cursor_display_position())
+                
+            }
+        }
+    }
+
     pub async fn delete_char(&mut self, buffer_id: BufferId, position: usize) -> ServerResult<()> {
         match self.buffers.get_mut(&buffer_id) {
             None => Err(ServerError::BufferNotFound),
