@@ -22,7 +22,10 @@ async fn test_create_buffer() {
 async fn test_create_buffer_with_content() {
     let mut client = EditorClient::new().await.unwrap();
 
-    let buffer_id = client.create_buffer(Some("hello world".to_string())).await.unwrap();
+    let buffer_id = client
+        .create_buffer(Some("hello world".to_string()))
+        .await
+        .unwrap();
     let content = client.get_content(buffer_id).await.unwrap();
     assert_eq!(content, "hello world");
 }
@@ -46,7 +49,10 @@ async fn test_basic_editing() {
 #[tokio::test]
 async fn test_cursor_operations() {
     let mut client = EditorClient::new().await.unwrap();
-    let buffer_id = client.create_buffer(Some("hello".to_string())).await.unwrap();
+    let buffer_id = client
+        .create_buffer(Some("hello".to_string()))
+        .await
+        .unwrap();
 
     // Test cursor position
     client.set_cursor_position(buffer_id, 2).await.unwrap();
@@ -78,8 +84,14 @@ async fn test_mode_operations() {
 async fn test_multiple_buffers() {
     let mut client = EditorClient::new().await.unwrap();
 
-    let buffer1 = client.create_buffer(Some("buffer1".to_string())).await.unwrap();
-    let buffer2 = client.create_buffer(Some("buffer2".to_string())).await.unwrap();
+    let buffer1 = client
+        .create_buffer(Some("buffer1".to_string()))
+        .await
+        .unwrap();
+    let buffer2 = client
+        .create_buffer(Some("buffer2".to_string()))
+        .await
+        .unwrap();
 
     assert_eq!(client.buffer_count(), 2);
 

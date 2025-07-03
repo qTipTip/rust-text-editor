@@ -1,7 +1,7 @@
 use rust_text_editor::server::editor_server::EditorServer;
-use tokio::time::{timeout, Duration};
-use std::collections::HashMap;
 use rust_text_editor::server::events::{BufferId, ClientId, EditMode, EditorEvent};
+use std::collections::HashMap;
+use tokio::time::{Duration, timeout};
 
 #[tokio::test]
 async fn test_server_creation() {
@@ -47,7 +47,10 @@ async fn test_buffer_creation_with_content() {
     let client_id = server.connect_client().await.unwrap();
 
     let initial_content = "Hello, World!";
-    let buffer_id = server.create_buffer(client_id, Some(initial_content.to_string())).await.unwrap();
+    let buffer_id = server
+        .create_buffer(client_id, Some(initial_content.to_string()))
+        .await
+        .unwrap();
 
     let content = server.get_buffer_content(buffer_id).await.unwrap();
     assert_eq!(content, initial_content);
@@ -57,7 +60,10 @@ async fn test_buffer_creation_with_content() {
 async fn test_buffer_edit_operations() {
     let mut server = EditorServer::new().await;
     let client_id = server.connect_client().await.unwrap();
-    let buffer_id = server.create_buffer(client_id, Some("abc".to_string())).await.unwrap();
+    let buffer_id = server
+        .create_buffer(client_id, Some("abc".to_string()))
+        .await
+        .unwrap();
 
     // Insert character at position
     server.insert_char(buffer_id, 1, 'X').await.unwrap();
@@ -74,7 +80,10 @@ async fn test_buffer_edit_operations() {
 async fn test_cursor_operations() {
     let mut server = EditorServer::new().await;
     let client_id = server.connect_client().await.unwrap();
-    let buffer_id = server.create_buffer(client_id, Some("hello\nworld".to_string())).await.unwrap();
+    let buffer_id = server
+        .create_buffer(client_id, Some("hello\nworld".to_string()))
+        .await
+        .unwrap();
 
     // Set cursor position
     server.set_cursor_position(buffer_id, 3).await.unwrap();
@@ -101,7 +110,10 @@ async fn test_cursor_movement_up() {
     let mut server = EditorServer::new().await;
     let client_id = server.connect_client().await.unwrap();
 
-    let buffer_id = server.create_buffer(client_id, Some("hello\nworld\ntest".to_string())).await.unwrap();
+    let buffer_id = server
+        .create_buffer(client_id, Some("hello\nworld\ntest".to_string()))
+        .await
+        .unwrap();
 
     let initial_pos = server.get_cursor_position(buffer_id).await.unwrap();
     assert_eq!(initial_pos, 16);
@@ -125,7 +137,10 @@ async fn test_cursor_movement_down() {
     let client_id = server.connect_client().await.unwrap();
 
     // Create buffer with multi-line content and set cursor to beginning
-    let buffer_id = server.create_buffer(client_id, Some("hello\nworld\ntest".to_string())).await.unwrap();
+    let buffer_id = server
+        .create_buffer(client_id, Some("hello\nworld\ntest".to_string()))
+        .await
+        .unwrap();
     server.set_cursor_position(buffer_id, 0).await.unwrap(); // Start at beginning
 
     // Move cursor down once (should go to start of "world" line, position 6)
@@ -148,8 +163,11 @@ async fn test_cursor_movement_down() {
 async fn test_cursor_movement_up_down_column_preservation() {
     let mut server = EditorServer::new().await;
     let client_id = server.connect_client().await.unwrap();
-    
-    let buffer_id = server.create_buffer(client_id, Some("hello world\nhi\nhello again".to_string())).await.unwrap();
+
+    let buffer_id = server
+        .create_buffer(client_id, Some("hello world\nhi\nhello again".to_string()))
+        .await
+        .unwrap();
 
     // Set cursor to position 8 (in "hello world" line, after "hello wo")
     server.set_cursor_position(buffer_id, 8).await.unwrap();
@@ -167,7 +185,7 @@ async fn test_cursor_movement_up_down_column_preservation() {
     server.move_cursor_up(buffer_id).await.unwrap();
     let pos_after_up = server.get_cursor_position(buffer_id).await.unwrap();
     assert_eq!(pos_after_up, 14);
-    
+
     server.move_cursor_up(buffer_id).await.unwrap();
     let pos_after_up2 = server.get_cursor_position(buffer_id).await.unwrap();
     assert_eq!(pos_after_up2, 2);
@@ -179,7 +197,10 @@ async fn test_cursor_movement_single_line() {
     let client_id = server.connect_client().await.unwrap();
 
     // Create buffer with single line
-    let buffer_id = server.create_buffer(client_id, Some("single line".to_string())).await.unwrap();
+    let buffer_id = server
+        .create_buffer(client_id, Some("single line".to_string()))
+        .await
+        .unwrap();
 
     // Set cursor to middle
     server.set_cursor_position(buffer_id, 5).await.unwrap();
@@ -234,7 +255,10 @@ async fn test_all_cursor_movements_together() {
     let client_id = server.connect_client().await.unwrap();
 
     // Create a 3x3 grid of text
-    let buffer_id = server.create_buffer(client_id, Some("abc\ndef\nghi".to_string())).await.unwrap();
+    let buffer_id = server
+        .create_buffer(client_id, Some("abc\ndef\nghi".to_string()))
+        .await
+        .unwrap();
 
     // Start at beginning (position 0, should be 'a')
     server.set_cursor_position(buffer_id, 0).await.unwrap();
@@ -280,8 +304,14 @@ async fn test_event_broadcasting() {
     let buffer_id = server.create_buffer(client1_id, None).await.unwrap();
 
     // Subscribe both clients to buffer events
-    server.subscribe_to_buffer(client1_id, buffer_id).await.unwrap();
-    server.subscribe_to_buffer(client2_id, buffer_id).await.unwrap();
+    server
+        .subscribe_to_buffer(client1_id, buffer_id)
+        .await
+        .unwrap();
+    server
+        .subscribe_to_buffer(client2_id, buffer_id)
+        .await
+        .unwrap();
 
     // Make a change that should trigger events
     server.insert_char(buffer_id, 0, 'A').await.unwrap();
@@ -294,7 +324,11 @@ async fn test_event_broadcasting() {
     assert!(!client2_events.is_empty());
 
     // Check event content
-    if let EditorEvent::BufferChanged { buffer_id: event_buffer_id, .. } = &client1_events[0] {
+    if let EditorEvent::BufferChanged {
+        buffer_id: event_buffer_id,
+        ..
+    } = &client1_events[0]
+    {
         assert_eq!(*event_buffer_id, buffer_id);
     } else {
         panic!("Expected BufferChanged event");
@@ -312,12 +346,18 @@ async fn test_modal_editing_states() {
     assert_eq!(mode, EditMode::Normal);
 
     // Switch to Insert mode
-    server.set_edit_mode(buffer_id, EditMode::Insert).await.unwrap();
+    server
+        .set_edit_mode(buffer_id, EditMode::Insert)
+        .await
+        .unwrap();
     let mode = server.get_edit_mode(buffer_id).await.unwrap();
     assert_eq!(mode, EditMode::Insert);
 
     // Switch to Visual mode
-    server.set_edit_mode(buffer_id, EditMode::Visual).await.unwrap();
+    server
+        .set_edit_mode(buffer_id, EditMode::Visual)
+        .await
+        .unwrap();
     let mode = server.get_edit_mode(buffer_id).await.unwrap();
     assert_eq!(mode, EditMode::Visual);
 }
@@ -328,15 +368,22 @@ async fn test_mode_change_events() {
     let client_id = server.connect_client().await.unwrap();
     let buffer_id = server.create_buffer(client_id, None).await.unwrap();
 
-    server.subscribe_to_buffer(client_id, buffer_id).await.unwrap();
+    server
+        .subscribe_to_buffer(client_id, buffer_id)
+        .await
+        .unwrap();
 
-    server.set_edit_mode(buffer_id, EditMode::Insert).await.unwrap();
+    server
+        .set_edit_mode(buffer_id, EditMode::Insert)
+        .await
+        .unwrap();
 
     let events = server.get_client_events(client_id).await.unwrap();
-    let mode_events: Vec<_> = events.iter()
+    let mode_events: Vec<_> = events
+        .iter()
         .filter_map(|e| match e {
             EditorEvent::ModeChanged { mode, .. } => Some(mode),
-            _ => None
+            _ => None,
         })
         .collect();
 
@@ -348,15 +395,20 @@ async fn test_mode_change_events() {
 async fn test_concurrent_client_operations() {
     let server = std::sync::Arc::new(tokio::sync::Mutex::new(EditorServer::new().await));
 
-    let handles: Vec<_> = (0..5).map(|i| {
-        let server_clone = server.clone();
-        tokio::spawn(async move {
-            let mut server_guard = server_clone.lock().await;
-            let client_id = server_guard.connect_client().await.unwrap();
-            let buffer_id = server_guard.create_buffer(client_id, Some(format!("Buffer {}", i))).await.unwrap();
-            (client_id, buffer_id)
+    let handles: Vec<_> = (0..5)
+        .map(|i| {
+            let server_clone = server.clone();
+            tokio::spawn(async move {
+                let mut server_guard = server_clone.lock().await;
+                let client_id = server_guard.connect_client().await.unwrap();
+                let buffer_id = server_guard
+                    .create_buffer(client_id, Some(format!("Buffer {}", i)))
+                    .await
+                    .unwrap();
+                (client_id, buffer_id)
+            })
         })
-    }).collect();
+        .collect();
 
     let results: Vec<_> = futures::future::join_all(handles).await;
 

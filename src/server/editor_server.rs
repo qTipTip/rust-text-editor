@@ -1,8 +1,8 @@
-use crate::server::server_client::Client;
 use crate::server::events::ServerError::{BufferNotFound, ClientNotFound};
 use crate::server::events::{
     BufferId, ClientId, EditMode, EditorEvent, ServerError, ServerResult, TextChange,
 };
+use crate::server::server_client::Client;
 use crate::text_buffer::TextBuffer;
 use std::collections::HashMap;
 
@@ -11,7 +11,6 @@ pub struct EditorServer {
     buffers: HashMap<BufferId, TextBuffer>,
     buffer_owners: HashMap<BufferId, ClientId>, // One client owner per buffer
 }
-
 
 impl EditorServer {
     pub async fn new() -> Self {
@@ -26,13 +25,10 @@ impl EditorServer {
             Some(buffer) => {
                 buffer.set_edit_mode(mode.clone());
 
-                let event = EditorEvent::ModeChanged {
-                    buffer_id,
-                    mode,
-                };
+                let event = EditorEvent::ModeChanged { buffer_id, mode };
                 self.broadcast_event_to_buffer(buffer_id, event).await;
                 Ok(())
-            },
+            }
 
             _ => Err(BufferNotFound),
         }
@@ -81,7 +77,6 @@ impl EditorServer {
         buffer_id: BufferId,
         event: EditorEvent,
     ) -> ServerResult<()> {
-
         for (client_id, client) in self.clients.iter_mut() {
             if client.is_subscribed_to_buffer(buffer_id) {
                 client.push_to_event_queue(event.clone())
@@ -150,13 +145,13 @@ impl EditorServer {
         }
     }
 
-    pub async fn get_cursor_display_position(&self, buffer_id: BufferId) -> ServerResult<(usize, usize)> {
+    pub async fn get_cursor_display_position(
+        &self,
+        buffer_id: BufferId,
+    ) -> ServerResult<(usize, usize)> {
         match self.buffers.get(&buffer_id) {
-            None => {Err(BufferNotFound)},
-            Some(buffer) => {
-                Ok(buffer.get_cursor_display_position())
-                
-            }
+            None => Err(BufferNotFound),
+            Some(buffer) => Ok(buffer.get_cursor_display_position()),
         }
     }
 

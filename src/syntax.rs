@@ -1,6 +1,6 @@
+use crossterm::style::{Color, ContentStyle, Stylize};
 use ropey::Rope;
 use std::path::Path;
-use crossterm::style::{Color, ContentStyle, Stylize};
 use tree_sitter::{Language, Parser, Query, QueryCursor, StreamingIterator, Tree};
 pub enum HighlightType {
     Keyword,
@@ -129,7 +129,7 @@ impl SyntaxHighlighter {
                 highlights.push((relative_start, relative_end, highlight_type));
             }
         }
-        highlights.sort_by_key(|&(start, _, _) | start);
+        highlights.sort_by_key(|&(start, _, _)| start);
         highlights
     }
 

@@ -1,8 +1,8 @@
 use rust_text_editor::editor::Editor;
-use std::path::PathBuf;
-use std::fs;
-use tempfile::TempDir;
 use rust_text_editor::server::events::EditMode;
+use std::fs;
+use std::path::PathBuf;
+use tempfile::TempDir;
 
 #[tokio::test]
 async fn test_editor_creation() {
@@ -62,7 +62,9 @@ async fn test_editor_text_operations() {
 
 #[tokio::test]
 async fn test_editor_cursor_operations() {
-    let mut editor = Editor::with_content("hello\nworld".to_string()).await.unwrap();
+    let mut editor = Editor::with_content("hello\nworld".to_string())
+        .await
+        .unwrap();
 
     // Test cursor positioning
     editor.set_cursor_position(3).await.unwrap();
@@ -86,7 +88,9 @@ async fn test_editor_cursor_operations() {
 
 #[tokio::test]
 async fn test_editor_multi_line_cursor() {
-    let mut editor = Editor::with_content("hello\nworld\ntest".to_string()).await.unwrap();
+    let mut editor = Editor::with_content("hello\nworld\ntest".to_string())
+        .await
+        .unwrap();
 
     // Set cursor to second line, third character
     editor.set_cursor_position(8).await.unwrap(); // h-e-l-l-o-\n-w-o
@@ -135,7 +139,9 @@ async fn test_editor_file_operations() {
     let temp_dir = TempDir::new().unwrap();
     let file_path = temp_dir.path().join("save_test.txt");
 
-    let mut editor = Editor::with_content("Original content".to_string()).await.unwrap();
+    let mut editor = Editor::with_content("Original content".to_string())
+        .await
+        .unwrap();
 
     // Save to new file
     editor.save_as(file_path.clone()).await.unwrap();
@@ -163,12 +169,18 @@ async fn test_editor_buffer_management() {
     let mut editor = Editor::new().await.unwrap();
 
     // Create first buffer
-    let buffer1_id = editor.create_new_buffer(Some("Buffer 1".to_string())).await.unwrap();
+    let buffer1_id = editor
+        .create_new_buffer(Some("Buffer 1".to_string()))
+        .await
+        .unwrap();
     assert_eq!(editor.buffer_count(), 1);
     assert_eq!(editor.current_buffer_id(), Some(buffer1_id));
 
     // Create second buffer
-    let buffer2_id = editor.create_new_buffer(Some("Buffer 2".to_string())).await.unwrap();
+    let buffer2_id = editor
+        .create_new_buffer(Some("Buffer 2".to_string()))
+        .await
+        .unwrap();
     assert_eq!(editor.buffer_count(), 2);
     assert_eq!(editor.current_buffer_id(), Some(buffer2_id)); // Should switch to new buffer
 
@@ -200,7 +212,9 @@ async fn test_editor_error_handling() {
 
 #[tokio::test]
 async fn test_editor_display_info() {
-    let mut editor = Editor::with_content("hello\nworld".to_string()).await.unwrap();
+    let mut editor = Editor::with_content("hello\nworld".to_string())
+        .await
+        .unwrap();
 
     // Test status message
     let status = editor.get_status_message();

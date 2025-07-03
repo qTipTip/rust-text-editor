@@ -1,7 +1,7 @@
+use crate::server::events::EditMode;
 use ropey::Rope;
 use std::cmp::min;
 use std::hash::{DefaultHasher, Hash, Hasher};
-use crate::server::events::EditMode;
 
 pub struct TextBuffer {
     content: Rope,
@@ -10,7 +10,7 @@ pub struct TextBuffer {
     original_cursor_position: usize,
     cursor_position: usize,
     content_hash: u64,
-    edit_mode: EditMode
+    edit_mode: EditMode,
 }
 
 impl TextBuffer {
@@ -118,7 +118,7 @@ impl TextBuffer {
             let col_in_line = self.cursor_position - current_line_start;
 
             let prev_line_start = self.content.line_to_char(line_idx - 1);
-            let prev_line_visible_len = self.get_line_visible_length(line_idx-1);
+            let prev_line_visible_len = self.get_line_visible_length(line_idx - 1);
 
             self.cursor_position = prev_line_start + min(col_in_line, prev_line_visible_len);
         }
@@ -212,12 +212,11 @@ impl TextBuffer {
 
         let line = self.content.line(line_idx);
         if line.len_chars() > 0 && line.char(line.len_chars() - 1) == '\n' {
-            line.len_chars() - 1  // Exclude newline
+            line.len_chars() - 1 // Exclude newline
         } else {
-            line.len_chars()  // Last line has no newline
+            line.len_chars() // Last line has no newline
         }
     }
-
 }
 
 #[cfg(test)]
@@ -531,7 +530,6 @@ mod tests {
         // Your current logic: position < cursor_position (false), so no change
         assert_eq!(buffer.get_cursor_position(), 2);
     }
-
 
     #[test]
     fn test_delete_char_out_of_bounds() {

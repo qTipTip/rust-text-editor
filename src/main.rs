@@ -2,11 +2,11 @@ use crate::editor::Editor;
 use std::io;
 use std::path::{Path, PathBuf};
 
-mod editor;
-mod text_buffer;
-mod syntax;
-mod server;
 mod client;
+mod editor;
+mod server;
+mod syntax;
+mod text_buffer;
 #[tokio::main]
 async fn main() -> io::Result<()> {
     let args: Vec<String> = std::env::args().collect();
@@ -27,7 +27,8 @@ async fn main() -> io::Result<()> {
                 eprintln!("Error creating editor file: {} {:?}", &args[1], e);
                 std::process::exit(1);
             }
-        }    };
+        }
+    };
 
     // match editor.run().await {
     //     Ok(()) => {

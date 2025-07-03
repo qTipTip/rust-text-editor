@@ -98,10 +98,14 @@ impl Editor {
     pub async fn insert_char_at_cursor(&mut self, ch: char) -> EditorResult<()> {
         match self.current_buffer_id {
             None => Err(NoActiveBuffer),
-            Some(buffer_id) => {
-                Ok(self.client
-                    .insert_char(buffer_id, self.client.get_cursor_position(buffer_id).await?, ch).await?)
-            }
+            Some(buffer_id) => Ok(self
+                .client
+                .insert_char(
+                    buffer_id,
+                    self.client.get_cursor_position(buffer_id).await?,
+                    ch,
+                )
+                .await?),
         }
     }
     pub async fn delete_char_at_cursor(&mut self) -> EditorResult<()> {
@@ -114,10 +118,8 @@ impl Editor {
     // Cursor operations
     pub async fn get_cursor_position(&self) -> EditorResult<usize> {
         match self.current_buffer_id {
-            None => {Err(NoActiveBuffer)}
-            Some(buffer_id) => {
-                Ok(self.client.get_cursor_position(buffer_id).await?)
-            }
+            None => Err(NoActiveBuffer),
+            Some(buffer_id) => Ok(self.client.get_cursor_position(buffer_id).await?),
         }
     }
     pub async fn set_cursor_position(&mut self, position: usize) -> EditorResult<()> {
@@ -128,10 +130,8 @@ impl Editor {
     }
     pub async fn get_cursor_display_position(&self) -> EditorResult<(usize, usize)> {
         match self.current_buffer_id {
-            None => {Err(NoActiveBuffer)}
-            Some(buffer_id) => {
-                Ok(self.client.get_cursor_display_position(buffer_id).await?)
-            }
+            None => Err(NoActiveBuffer),
+            Some(buffer_id) => Ok(self.client.get_cursor_display_position(buffer_id).await?),
         }
     }
     pub async fn move_cursor_left(&mut self) -> EditorResult<()> {
