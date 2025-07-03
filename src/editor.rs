@@ -3,7 +3,12 @@ use crate::editor::EditorError::{IoError, NoActiveBuffer};
 use crate::server::events::{BufferId, EditMode};
 use crate::server::server_client::Client;
 use std::fs::read_to_string;
+use std::io::{stdout, Write};
 use std::path::PathBuf;
+use crossterm::cursor::Hide;
+use crossterm::execute;
+use crossterm::style::Print;
+use crossterm::terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen};
 use ropey::str_utils::char_to_byte_idx;
 
 #[derive(Debug)]
@@ -357,6 +362,14 @@ impl Editor {
 
     // Terminal integration
     pub async fn run(&mut self) -> EditorResult<()> {
-        todo!()
+        enable_raw_mode()?;
+        execute!(stdout(), EnterAlternateScreen)?;
+
+        // let result = self.event_loop();
+        disable_raw_mode()?;
+        execute!(stdout(), LeaveAlternateScreen)?;
+        
+        Ok(())
     }
 }
+
