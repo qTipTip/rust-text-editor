@@ -2,6 +2,7 @@ use crate::client::editor_client::{ClientError, EditorClient};
 use crate::editor::EditorError::NoActiveBuffer;
 use crate::server::events::{BufferId, EditMode};
 use crate::server::server_client::Client;
+use std::fs::read_to_string;
 use std::path::PathBuf;
 
 #[derive(Debug)]
@@ -64,7 +65,13 @@ impl Editor {
         })
     }
     pub async fn open_file(path: PathBuf) -> EditorResult<Self> {
-        todo!()
+        let content = read_to_string(&path)?;
+        
+        let mut new_editor = Self::with_content(content).await?;
+        new_editor.status_message = format!("Opened file: {}", path.display());
+        new_editor.current_file = Some(path);
+        
+        Ok(new_editor)
     }
 
     // Buffer management
@@ -140,7 +147,7 @@ impl Editor {
 
     // File operations
     pub fn current_file_path(&self) -> Option<&PathBuf> {
-        todo!()
+        self.current_file.as_ref()
     }
     pub fn is_modified(&self) -> bool {
         todo!()
