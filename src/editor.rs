@@ -1,13 +1,13 @@
-use fs::read_to_string;
+use crate::syntax::{HighlightType, SyntaxHighlighter};
 use crate::text_buffer::TextBuffer;
-use crate::syntax::{SyntaxHighlighter, HighlightType};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use crossterm::style::{Print, ResetColor, SetStyle};
 use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode};
 use crossterm::{cursor, event, execute, terminal, terminal::enable_raw_mode};
-use std::{fs, io};
+use fs::read_to_string;
 use std::io::{Write, stdout};
 use std::path::PathBuf;
+use std::{fs, io};
 use tree_sitter::Tree;
 
 pub struct Editor {
@@ -34,7 +34,7 @@ impl Editor {
     }
 
     pub fn with_content(content: String) -> Self {
-        let mut editor = Self{
+        let mut editor = Self {
             buffer: TextBuffer::from_string(content),
             current_file: None,
             scroll_offset: 0,
@@ -105,7 +105,6 @@ impl Editor {
     }
 
     fn event_loop(&mut self) -> io::Result<()> {
-
         let (_, term_height) = terminal::size()?;
         self.viewport_size = (term_height as usize).saturating_sub(2); // Reserve 2 lines for status
 
@@ -122,13 +121,10 @@ impl Editor {
         Ok(())
     }
 
-
     fn render(&self) -> io::Result<()> {
-
         let (_, term_height) = terminal::size()?;
         let content_height = (term_height as usize).saturating_sub(2);
-        
-        
+
         // Flush the terminal, and set the cursor to (0,0)
         execute!(stdout(), cursor::Hide)?;
         // execute!(stdout(), terminal::Clear(terminal::ClearType::All))?;
@@ -151,7 +147,6 @@ impl Editor {
                 execute!(stdout(), Print("~"))?;
             }
         }
-
 
         // Then we write the statusline
         let (row, col) = self.buffer.get_cursor_display_position();
@@ -193,7 +188,8 @@ impl Editor {
         match key_event.code {
             KeyCode::Char('q') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
                 if self.is_modified() {
-                    self.status_message = "File modified, press ctrl-q to quit without saving".to_string();
+                    self.status_message =
+                        "File modified, press ctrl-q to quit without saving".to_string();
                     return Ok(false);
                 }
                 return Ok(true);
@@ -214,7 +210,7 @@ impl Editor {
             }
             KeyCode::Char('a') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
                 match self.save_file_as() {
-                    Ok(_) | Err(_) => {},
+                    Ok(_) | Err(_) => {}
                 }
             }
             KeyCode::Char(ch) => {
@@ -247,7 +243,6 @@ impl Editor {
     }
 
     fn update_scroll(&mut self) {
-
         let (cursor_row, _) = self.buffer.get_cursor_display_position();
 
         if cursor_row >= self.scroll_offset + self.viewport_size {
@@ -274,7 +269,8 @@ impl Editor {
         let line_str = line.to_string();
 
         let highlights = if let Some(tree) = &self.syntax_tree {
-            self.syntax_highlighter.highlight_line(buffer_contents, line_idx, tree)
+            self.syntax_highlighter
+                .highlight_line(buffer_contents, line_idx, tree)
         } else {
             Vec::new()
         };
@@ -296,7 +292,12 @@ impl Editor {
             if start < end && end <= line_chars.len() {
                 let highlighted_text: String = line_chars[start..end].iter().collect();
                 let style = highlight_type.to_style();
-                execute!(stdout(), SetStyle(style), Print(highlighted_text), ResetColor)?;
+                execute!(
+                    stdout(),
+                    SetStyle(style),
+                    Print(highlighted_text),
+                    ResetColor
+                )?;
             }
 
             current_pos = end;
