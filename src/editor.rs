@@ -1,7 +1,8 @@
-use std::path::PathBuf;
 use crate::client::editor_client::{ClientError, EditorClient};
+use crate::editor::EditorError::NoActiveBuffer;
 use crate::server::events::{BufferId, EditMode};
 use crate::server::server_client::Client;
+use std::path::PathBuf;
 
 #[derive(Debug)]
 pub enum EditorError {
@@ -43,13 +44,24 @@ impl Editor {
             current_buffer_id: None,
             current_file: None,
             is_modified: false,
-            status_message: "".to_string(),
+            status_message: "Hello from rust-text-editor".to_string(),
             viewport_size: 0,
             scroll_offset: 0,
         })
     }
     pub async fn with_content(content: String) -> EditorResult<Self> {
-        todo!()
+        let mut client = EditorClient::new().await?;
+        let buffer_id = client.create_buffer(Some(content)).await?;
+
+        Ok(Self {
+            client: client,
+            current_buffer_id: Some(buffer_id),
+            current_file: None,
+            is_modified: false,
+            status_message: "Hello from rust-text-editor".to_string(),
+            viewport_size: 0,
+            scroll_offset: 0,
+        })
     }
     pub async fn open_file(path: PathBuf) -> EditorResult<Self> {
         todo!()
@@ -69,7 +81,10 @@ impl Editor {
         todo!()
     }
     pub async fn get_current_buffer_content(&self) -> EditorResult<String> {
-        todo!()
+        match self.current_buffer_id {
+            None => Err(NoActiveBuffer),
+            Some(buffer_id) => Ok(self.client.get_content(buffer_id).await?),
+        }
     }
 
     // Text operations
