@@ -24,21 +24,32 @@ pub type ClientResult<T> = Result<T, ClientError>;
 
 impl EditorClient {
     pub async fn new() -> ClientResult<Self> {
-        // Your implementation here
-        todo!()
+        let mut server = EditorServer::new().await;
+        let client_id = server.connect_client().await?;
+
+        Ok(Self {
+            server,
+            client_id,
+            active_buffers: Vec::new(),
+        })
     }
 
     pub async fn create_buffer(&mut self, content: Option<String>) -> ClientResult<BufferId> {
-        // Your implementation here
-        todo!()
+        let buffer_id = self.server.create_buffer(self.client_id, content).await?;
+        self.active_buffers.push(buffer_id);
+        Ok(buffer_id)
     }
 
     pub async fn get_content(&self, buffer_id: BufferId) -> ClientResult<String> {
-        // Your implementation here
-        todo!()
+        Ok(self.server.get_buffer_content(buffer_id).await?)
     }
 
-    pub async fn insert_char(&mut self, buffer_id: BufferId, position: usize, ch: char) -> ClientResult<()> {
+    pub async fn insert_char(
+        &mut self,
+        buffer_id: BufferId,
+        position: usize,
+        ch: char,
+    ) -> ClientResult<()> {
         // Your implementation here
         todo!()
     }
@@ -53,7 +64,11 @@ impl EditorClient {
         todo!()
     }
 
-    pub async fn set_cursor_position(&mut self, buffer_id: BufferId, position: usize) -> ClientResult<()> {
+    pub async fn set_cursor_position(
+        &mut self,
+        buffer_id: BufferId,
+        position: usize,
+    ) -> ClientResult<()> {
         // Your implementation here
         todo!()
     }
@@ -74,7 +89,6 @@ impl EditorClient {
     }
 
     pub fn buffer_count(&self) -> usize {
-        // Your implementation here
-        todo!()
+        self.active_buffers.len()
     }
 }
