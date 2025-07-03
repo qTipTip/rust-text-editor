@@ -83,10 +83,13 @@ impl Editor {
         self.client.buffer_count()
     }
     pub async fn create_new_buffer(&mut self, content: Option<String>) -> EditorResult<BufferId> {
-        todo!()
+        let buffer_id = self.client.create_buffer(content).await?;
+        self.current_buffer_id = Some(buffer_id);
+        Ok(buffer_id)
     }
     pub async fn switch_to_buffer(&mut self, buffer_id: BufferId) -> EditorResult<()> {
-        todo!()
+        self.current_buffer_id = Some(buffer_id);
+        Ok(())
     }
     pub async fn get_current_buffer_content(&self) -> EditorResult<String> {
         match self.current_buffer_id {
@@ -257,21 +260,21 @@ impl Editor {
 
     // Display operations
     pub fn get_status_message(&self) -> &str {
-        todo!()
+        self.status_message.as_str()
     }
     pub fn set_status_message(&mut self, message: String) {
-        todo!()
+        self.status_message = message;
     }
     pub fn get_viewport_size(&self) -> usize {
-        todo!()
+        self.viewport_size
     }
     pub fn set_viewport_size(&mut self, size: usize) {
-        todo!()
+        self.viewport_size = size;
     }
     pub fn get_scroll_offset(&self) -> usize {
-        todo!()
+        self.scroll_offset
     }
     pub fn set_scroll_offset(&mut self, offset: usize) {
-        todo!()
+        self.scroll_offset = offset;
     }
 }
