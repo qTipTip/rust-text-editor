@@ -1,8 +1,8 @@
-use crate::server::client::Client;
 use crate::server::events::ServerError::{BufferNotFound, ClientNotFound};
 use crate::server::events::{
     BufferId, ClientId, EditMode, EditorEvent, ServerError, ServerResult, TextChange,
 };
+use crate::server::server_client::Client;
 use crate::text_buffer::TextBuffer;
 use std::collections::HashMap;
 
@@ -25,13 +25,10 @@ impl EditorServer {
             Some(buffer) => {
                 buffer.set_edit_mode(mode.clone());
 
-                let event = EditorEvent::ModeChanged {
-                    buffer_id,
-                    mode,
-                };
+                let event = EditorEvent::ModeChanged { buffer_id, mode };
                 self.broadcast_event_to_buffer(buffer_id, event).await;
                 Ok(())
-            },
+            }
 
             _ => Err(BufferNotFound),
         }
@@ -80,7 +77,6 @@ impl EditorServer {
         buffer_id: BufferId,
         event: EditorEvent,
     ) -> ServerResult<()> {
-
         for (client_id, client) in self.clients.iter_mut() {
             if client.is_subscribed_to_buffer(buffer_id) {
                 client.push_to_event_queue(event.clone())
@@ -108,6 +104,26 @@ impl EditorServer {
             }
         }
     }
+
+    pub async fn move_cursor_up(&mut self, buffer_id: BufferId) -> ServerResult<()> {
+        match self.buffers.get_mut(&buffer_id) {
+            None => Err(BufferNotFound),
+            Some(buffer) => {
+                buffer.move_cursor_up();
+                Ok(())
+            }
+        }
+    }
+
+    pub async fn move_cursor_down(&mut self, buffer_id: BufferId) -> ServerResult<()> {
+        match self.buffers.get_mut(&buffer_id) {
+            None => Err(BufferNotFound),
+            Some(buffer) => {
+                buffer.move_cursor_down();
+                Ok(())
+            }
+        }
+    }
     pub async fn get_cursor_position(&self, buffer_id: BufferId) -> ServerResult<usize> {
         match self.buffers.get(&buffer_id) {
             None => Err(BufferNotFound),
@@ -118,14 +134,24 @@ impl EditorServer {
     pub async fn set_cursor_position(
         &mut self,
         buffer_id: BufferId,
-        position: i32,
+        position: usize,
     ) -> ServerResult<()> {
         match self.buffers.get_mut(&buffer_id) {
             None => Err(BufferNotFound),
             Some(buffer) => {
-                buffer.set_cursor_position(position as usize);
+                buffer.set_cursor_position(position);
                 Ok(())
             }
+        }
+    }
+
+    pub async fn get_cursor_display_position(
+        &self,
+        buffer_id: BufferId,
+    ) -> ServerResult<(usize, usize)> {
+        match self.buffers.get(&buffer_id) {
+            None => Err(BufferNotFound),
+            Some(buffer) => Ok(buffer.get_cursor_display_position()),
         }
     }
 

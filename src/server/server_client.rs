@@ -1,16 +1,16 @@
-use std::collections::HashSet;
 use crate::server::events::{BufferId, EditorEvent};
+use std::collections::HashSet;
 
 pub struct Client {
     editor_events: Vec<EditorEvent>,
-    subscribed_buffers: HashSet<BufferId>
+    subscribed_buffers: HashSet<BufferId>,
 }
 
 impl Client {
-    pub(crate) fn new() -> Self{
+    pub(crate) fn new() -> Self {
         Self {
             editor_events: Vec::new(),
-            subscribed_buffers: HashSet::new()
+            subscribed_buffers: HashSet::new(),
         }
     }
 
@@ -33,6 +33,4 @@ impl Client {
     pub fn push_to_event_queue(&mut self, event: EditorEvent) {
         self.editor_events.push(event);
     }
-
-
 }
