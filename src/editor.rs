@@ -285,7 +285,20 @@ impl Editor {
         todo!()
     }
     pub async fn update_scroll_for_cursor(&mut self) -> EditorResult<()> {
-        todo!()
+        // Make sure the scroll-offset is modified to accommodate the cursor display positon.
+
+
+        let (cursor_row, _) = self.get_cursor_display_position().await?;
+
+        if cursor_row >= self.scroll_offset + self.viewport_size {
+            self.scroll_offset = cursor_row - self.viewport_size + 1;
+        }
+
+        if cursor_row < self.scroll_offset {
+            self.scroll_offset = cursor_row;
+        }
+
+        Ok(())
     }
 
     // Input handling
@@ -313,5 +326,5 @@ impl Editor {
     // Terminal integration
     pub async fn run(&mut self) -> EditorResult<()> {
         todo!()
-    } 
+    }
 }
