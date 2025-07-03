@@ -1,5 +1,3 @@
 pub mod editor_server;
-pub mod client;
+pub mod server_client;
 pub mod events;
-
-pub use events::*;

@@ -1,8 +1,8 @@
 use rust_text_editor::editor::Editor;
-use rust_text_editor::server::{EditMode, BufferId};
 use std::path::PathBuf;
 use std::fs;
 use tempfile::TempDir;
+use rust_text_editor::server::events::EditMode;
 
 #[tokio::test]
 async fn test_editor_creation() {

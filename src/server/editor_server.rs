@@ -1,4 +1,4 @@
-use crate::server::client::Client;
+use crate::server::server_client::Client;
 use crate::server::events::ServerError::{BufferNotFound, ClientNotFound};
 use crate::server::events::{
     BufferId, ClientId, EditMode, EditorEvent, ServerError, ServerResult, TextChange,

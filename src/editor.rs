@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use crate::{ClientError, EditorClient};
+use crate::client::editor_client::{ClientError, EditorClient};
 use crate::server::events::{BufferId, EditMode};
 
 #[derive(Debug)]
