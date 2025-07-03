@@ -30,14 +30,14 @@ async fn main() -> io::Result<()> {
         }
     };
 
-    // match editor.run().await {
-    //     Ok(()) => {
-    //         println!("editor exited successfully");
-    //     }
-    //     Err(e) => {
-    //         println!("editor exited with error: {}", e);
-    //     }
-    // }
+    match editor.run().await {
+        Ok(()) => {
+            println!("editor exited successfully");
+        }
+        Err(e) => {
+            println!("editor exited with error: {:?}", e);
+        }
+    }
 
     Ok(())
 }

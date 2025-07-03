@@ -277,4 +277,41 @@ impl Editor {
     pub fn set_scroll_offset(&mut self, offset: usize) {
         self.scroll_offset = offset;
     }
+
+    pub async fn get_visible_lines(&self) -> EditorResult<Vec<String>> {
+        todo!()
+    }
+    pub async fn get_status_line_info(&self) -> EditorResult<String> {
+        todo!()
+    }
+    pub async fn update_scroll_for_cursor(&mut self) -> EditorResult<()> {
+        todo!()
+    }
+
+    // Input handling
+    pub async fn handle_normal_mode_key(&mut self, key: char) -> EditorResult<()> {
+        todo!()
+    }
+    pub async fn handle_insert_mode_char(&mut self, ch: char) -> EditorResult<()> {
+        todo!()
+    }
+    pub async fn handle_insert_mode_backspace(&mut self) -> EditorResult<()> {
+        todo!()
+    }
+    pub async fn handle_insert_mode_escape(&mut self) -> EditorResult<()> {
+        todo!()
+    }
+
+    // Utility methods
+    pub fn mark_as_saved(&mut self) {
+        todo!()
+    }
+    pub async fn get_cursor_viewport_position(&self) -> EditorResult<(usize, usize)> {
+        todo!()
+    }
+
+    // Terminal integration
+    pub async fn run(&mut self) -> EditorResult<()> {
+        todo!()
+    } 
 }
