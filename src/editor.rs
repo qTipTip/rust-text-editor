@@ -1,9 +1,15 @@
 use crate::client::editor_client::{ClientError, EditorClient};
-use crate::editor::EditorError::{IoError, NoActiveBuffer};
+use crate::editor::EditorError::NoActiveBuffer;
 use crate::server::events::{BufferId, EditMode};
-use crate::server::server_client::Client;
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use crossterm::terminal::{
+    EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
+};
+use crossterm::{cursor, event, execute, terminal};
 use std::fs::read_to_string;
+use std::io::{Write, stdout};
 use std::path::PathBuf;
+use crossterm::style::Print;
 
 #[derive(Debug)]
 pub enum EditorError {
@@ -277,4 +283,356 @@ impl Editor {
     pub fn set_scroll_offset(&mut self, offset: usize) {
         self.scroll_offset = offset;
     }
+
+    pub async fn get_visible_lines(&self) -> EditorResult<Vec<String>> {
+        let buffer_id = self.current_buffer_id.ok_or(NoActiveBuffer)?;
+        let content = self.client.get_content(buffer_id).await?;
+
+        let lines: Vec<&str> = content.lines().collect();
+        let visible_lines = lines
+            .iter()
+            .skip(self.scroll_offset)
+            .take(self.viewport_size)
+            .map(|s| s.to_string())
+            .collect();
+
+        Ok(visible_lines)
+    }
+    pub async fn get_status_line_info(&self) -> EditorResult<String> {
+        let (row, col) = self.get_cursor_display_position().await.unwrap();
+        let current_mode = match self.get_current_mode().await? {
+            EditMode::Normal => "NORMAL",
+            EditMode::Insert => "INSERT",
+            EditMode::Visual => "VISUAL",
+            EditMode::Command => "COMMAND",
+        };
+        let status = self.get_status_message();
+        Ok(format!(
+            "Cursor: ({}:{}) | Mode: {:?} | Status: {}",
+            row + 1,
+            col + 1,
+            current_mode,
+            status
+        ))
+    }
+    pub async fn update_scroll_for_cursor(&mut self) -> EditorResult<()> {
+        // Make sure the scroll-offset is modified to accommodate the cursor display positon.
+
+        let (cursor_row, _) = self.get_cursor_display_position().await?;
+
+        if cursor_row >= self.scroll_offset + self.viewport_size {
+            self.scroll_offset = cursor_row - self.viewport_size + 1;
+        }
+
+        if cursor_row < self.scroll_offset {
+            self.scroll_offset = cursor_row;
+        }
+
+        Ok(())
+    }
+
+    // Input handling
+    pub async fn handle_normal_mode_key(&mut self, key: char) -> EditorResult<()> {
+        match key {
+            'i' => self.enter_insert_mode().await?,
+            'v' => self.enter_visual_mode().await?,
+            'k' => self.move_cursor_up().await?,
+            'l' => self.move_cursor_right().await?,
+            'h' => self.move_cursor_left().await?,
+            'j' => self.move_cursor_down().await?,
+            _ => {}
+        }
+
+        Ok(())
+    }
+    pub async fn handle_insert_mode_char(&mut self, ch: char) -> EditorResult<()> {
+        Ok(self.insert_char_at_cursor(ch).await?)
+    }
+    pub async fn handle_insert_mode_backspace(&mut self) -> EditorResult<()> {
+        self.move_cursor_left().await?;
+        Ok(self.delete_char_at_cursor().await?)
+    }
+    pub async fn handle_insert_mode_escape(&mut self) -> EditorResult<()> {
+        Ok(self.enter_normal_mode().await?)
+    }
+
+    // Utility methods
+    pub fn mark_as_saved(&mut self) {
+        self.is_modified = false;
+    }
+    pub async fn get_cursor_viewport_position(&self) -> EditorResult<(usize, usize)> {
+        let (cursor_row, cursor_col) = self.get_cursor_display_position().await?;
+        let viewport_row = cursor_row.saturating_sub(self.scroll_offset);
+        Ok((viewport_row, cursor_col))
+    }
+
+    // Terminal integration
+    pub async fn run(&mut self) -> EditorResult<()> {
+        if self.current_buffer_id.is_none() {
+            let buffer_id = self.create_new_buffer(None).await?;
+            self.current_buffer_id = Some(buffer_id);
+        }
+
+        enable_raw_mode().map_err(|e| EditorError::IoError(e))?;
+        execute!(stdout(), EnterAlternateScreen).map_err(|e| EditorError::IoError(e))?;
+
+        let result = self.event_loop().await;
+
+        disable_raw_mode().map_err(|e| EditorError::IoError(e))?;
+        execute!(stdout(), LeaveAlternateScreen).map_err(|e| EditorError::IoError(e))?;
+
+        result
+    }
+
+    async fn event_loop(&mut self) -> EditorResult<()> {
+        let (_, term_height) = terminal::size().map_err(|e| EditorError::IoError(e))?;
+        self.viewport_size = (term_height as usize).saturating_sub(2);
+
+        loop {
+            self.update_scroll_for_cursor().await?;
+            self.render().await?;
+
+            if let Event::Key(key_event) = event::read().map_err(|e| EditorError::IoError(e))? {
+                if self.handle_key_event(key_event).await? {
+                    break;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn render(&mut self) -> EditorResult<()> {
+        let (_, term_height) = terminal::size().map_err(|e| EditorError::IoError(e))?;
+        let content_height = (term_height as usize).saturating_sub(2);
+
+        // clear screen, move cursor to top left
+        execute!(stdout(), cursor::Hide).map_err(|e| EditorError::IoError(e))?;
+        execute!(stdout(), cursor::MoveTo(0, 0)).map_err(|e| EditorError::IoError(e))?;
+
+        // Render visible lines
+        let visible_lines = self.get_visible_lines().await?;
+
+        for display_row in 0..content_height {
+            execute!(stdout(), cursor::MoveTo(0, display_row as u16)).map_err(|e| EditorError::IoError(e))?;
+            execute!(stdout(), terminal::Clear(terminal::ClearType::CurrentLine)).map_err(|e| EditorError::IoError(e))?;
+
+            if display_row < visible_lines.len() {
+                // Render actual line content
+                execute!(stdout(), Print(&visible_lines[display_row])).map_err(|e| EditorError::IoError(e))?;
+            } else {
+                // Render empty line indicator
+                execute!(stdout(), Print("~")).map_err(|e| EditorError::IoError(e))?;
+            }
+        }
+
+        // Render status lines
+        self.render_status_lines().await?;
+
+        // Position cursor
+        let (viewport_row, viewport_col) = self.get_cursor_viewport_position().await?;
+        execute!(stdout(), cursor::MoveTo(viewport_col as u16, viewport_row as u16)).map_err(|e| EditorError::IoError(e))?;
+        execute!(stdout(), cursor::Show).map_err(|e| EditorError::IoError(e))?;
+
+        stdout().flush().map_err(|e| EditorError::IoError(e))?;
+        Ok(())
+
+    }
+
+    async fn render_status_lines(&mut self) -> EditorResult<()> {
+        let (_, term_height) = terminal::size().map_err(|e| EditorError::IoError(e))?;
+        let (cursor_row, cursor_col) = self.get_cursor_display_position().await?;
+
+        // First status line - mode and file info
+        execute!(stdout(), cursor::MoveTo(0, term_height - 2)).map_err(|e| EditorError::IoError(e))?;
+        execute!(stdout(), terminal::Clear(terminal::ClearType::CurrentLine)).map_err(|e| EditorError::IoError(e))?;
+
+        let status_info = self.get_status_line_info().await?;
+        let file_info = match &self.current_file {
+            Some(path) => format!(" | {}{}", path.display(), if self.is_modified { " [+]" } else { "" }),
+            None => format!(" | [No Name]{}", if self.is_modified { " [+]" } else { "" }),
+        };
+
+        execute!(stdout(), Print(format!("{}{}", status_info, file_info))).map_err(|e| EditorError::IoError(e))?;
+
+        // Second status line - help and statistics
+        execute!(stdout(), cursor::MoveTo(0, term_height - 1)).map_err(|e| EditorError::IoError(e))?;
+        execute!(stdout(), terminal::Clear(terminal::ClearType::CurrentLine)).map_err(|e| EditorError::IoError(e))?;
+
+        let help_text = match self.get_current_mode().await? {
+            EditMode::Normal => "i=Insert, v=Visual, :=Command, Ctrl+S=Save, Ctrl+Q=Quit",
+            EditMode::Insert => "ESC=Normal, Ctrl+S=Save",
+            EditMode::Visual => "ESC=Normal, d=Delete, y=Yank",
+            EditMode::Command => "ESC=Normal, Enter=Execute",
+        };
+
+        execute!(stdout(), Print(format!("{}:{} | {}", cursor_row + 1, cursor_col + 1, help_text))).map_err(|e| EditorError::IoError(e))?;
+
+        Ok(())
+    }
+
+    async fn handle_key_event(&mut self, key_event: KeyEvent) -> EditorResult<bool> {
+        // Only handle press and repeat events
+        match key_event.kind {
+            KeyEventKind::Release => return Ok(false),
+            KeyEventKind::Press | KeyEventKind::Repeat => {}
+        }
+
+        // Mode-specific key handling
+        let current_mode = self.get_current_mode().await?;
+        match current_mode {
+            EditMode::Normal => self.handle_normal_mode_input(key_event).await?,
+            EditMode::Insert => self.handle_insert_mode_input(key_event).await?,
+            EditMode::Visual => self.handle_visual_mode_input(key_event).await?,
+            EditMode::Command => self.handle_command_mode_input(key_event).await?,
+        }
+
+        Ok(false)
+    }
+
+    async fn handle_normal_mode_input(&mut self, key_event: KeyEvent) -> EditorResult<()> {
+        match key_event.code {
+
+            KeyCode::Char(ch) => {
+                match ch {
+                    ':' => {
+                        self.enter_command_mode().await?;
+                        self.status_message = ":".to_string();
+                    }
+                    _ => {
+                        self.handle_normal_mode_key(ch).await?;
+                        // Clear status message after successful command
+                        if !self.status_message.starts_with("File modified!") {
+                            self.status_message = "".to_string();
+                        }
+                    }
+                }
+            }
+
+            KeyCode::Left => self.move_cursor_left().await?,
+            KeyCode::Right => self.move_cursor_right().await?,
+            KeyCode::Up => self.move_cursor_up().await?,
+            KeyCode::Down => self.move_cursor_down().await?,
+            _ => {}
+        }
+        Ok(())
+    }
+
+    async fn handle_insert_mode_input(&mut self, key_event: KeyEvent) -> EditorResult<()> {
+        match key_event.code {
+            KeyCode::Esc => {
+                self.handle_insert_mode_escape().await?;
+                self.status_message = "".to_string();
+            }
+            KeyCode::Char(ch) => {
+                self.handle_insert_mode_char(ch).await?;
+            }
+            KeyCode::Backspace => {
+                self.handle_insert_mode_backspace().await?;
+            }
+            KeyCode::Enter => {
+                self.handle_insert_mode_char('\n').await?;
+            }
+            KeyCode::Left => self.move_cursor_left().await?,
+            KeyCode::Right => self.move_cursor_right().await?,
+            KeyCode::Up => self.move_cursor_up().await?,
+            KeyCode::Down => self.move_cursor_down().await?,
+            _ => {}
+        }
+        Ok(())
+    }
+
+    async fn handle_visual_mode_input(&mut self, key_event: KeyEvent) -> EditorResult<()> {
+        match key_event.code {
+            KeyCode::Esc => {
+                self.enter_normal_mode().await?;
+                self.status_message = "".to_string();
+            }
+            KeyCode::Char('h') => self.move_cursor_left().await?,
+            KeyCode::Char('j') => self.move_cursor_down().await?,
+            KeyCode::Char('k') => self.move_cursor_up().await?,
+            KeyCode::Char('l') => self.move_cursor_right().await?,
+            KeyCode::Left => self.move_cursor_left().await?,
+            KeyCode::Right => self.move_cursor_right().await?,
+            KeyCode::Up => self.move_cursor_up().await?,
+            KeyCode::Down => self.move_cursor_down().await?,
+            _ => {
+                // For now, just show that visual mode is not fully implemented
+                self.status_message = "Visual mode - ESC to return to Normal".to_string();
+            }
+        }
+        Ok(())
+    }
+
+    async fn handle_command_mode_input(&mut self, key_event: KeyEvent) -> EditorResult<()> {
+        match key_event.code {
+            KeyCode::Esc => {
+                self.enter_normal_mode().await?;
+                self.status_message = "".to_string();
+            }
+            KeyCode::Enter => {
+                // Execute command (basic implementation)
+                self.execute_command().await?;
+                self.enter_normal_mode().await?;
+            }
+            KeyCode::Char(ch) => {
+                // Add character to command
+                self.status_message.push(ch);
+            }
+            KeyCode::Backspace => {
+                // Remove last character from command
+                if self.status_message.len() > 1 {
+                    self.status_message.pop();
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    async fn execute_command(&mut self) -> EditorResult<()> {
+        let command = self.status_message.trim_start_matches(':').to_string();
+
+        match command.as_str() {
+            "q" => {
+                if self.is_modified {
+                    self.status_message = "File modified! Use :q! to quit without saving".to_string();
+                } else {
+                    std::process::exit(0);
+                }
+            }
+            "q!" => {
+                std::process::exit(0);
+            }
+            "w" => {
+                if let Err(e) = self.save().await {
+                    self.status_message = format!("Save failed: {:?}", e);
+                } else {
+                    self.status_message = "File saved".to_string();
+                }
+            }
+            "wq" => {
+                if let Err(e) = self.save().await {
+                    self.status_message = format!("Save failed: {:?}", e);
+                } else {
+                    std::process::exit(0);
+                }
+            }
+            _ if command.starts_with("w ") => {
+                let filename = command.strip_prefix("w ").unwrap().trim();
+                let path = PathBuf::from(filename);
+                if let Err(e) = self.save_as(path).await {
+                    self.status_message = format!("Save failed: {:?}", e);
+                } else {
+                    self.status_message = format!("Saved as {}", filename);
+                }
+            }
+            _ => {
+                self.status_message = format!("Unknown command: {}", command);
+            }
+        }
+
+        Ok(())
+    }
 }
+
