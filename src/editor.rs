@@ -135,16 +135,28 @@ impl Editor {
         }
     }
     pub async fn move_cursor_left(&mut self) -> EditorResult<()> {
-        todo!()
+        match self.current_buffer_id {
+            None => Err(NoActiveBuffer),
+            Some(buffer_id) => Ok(self.client.move_cursor_left(buffer_id).await?),
+        }
     }
     pub async fn move_cursor_right(&mut self) -> EditorResult<()> {
-        todo!()
+        match self.current_buffer_id {
+            None => Err(NoActiveBuffer),
+            Some(buffer_id) => Ok(self.client.move_cursor_right(buffer_id).await?),
+        }
     }
     pub async fn move_cursor_up(&mut self) -> EditorResult<()> {
-        todo!()
+        match self.current_buffer_id {
+            None => Err(NoActiveBuffer),
+            Some(buffer_id) => Ok(self.client.move_cursor_up(buffer_id).await?),
+        }
     }
     pub async fn move_cursor_down(&mut self) -> EditorResult<()> {
-        todo!()
+        match self.current_buffer_id {
+            None => Err(NoActiveBuffer),
+            Some(buffer_id) => Ok(self.client.move_cursor_down(buffer_id).await?),
+        }
     }
 
     // Modal operations
