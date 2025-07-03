@@ -66,11 +66,11 @@ impl Editor {
     }
     pub async fn open_file(path: PathBuf) -> EditorResult<Self> {
         let content = read_to_string(&path)?;
-        
+
         let mut new_editor = Self::with_content(content).await?;
         new_editor.status_message = format!("Opened file: {}", path.display());
         new_editor.current_file = Some(path);
-        
+
         Ok(new_editor)
     }
 
@@ -96,7 +96,13 @@ impl Editor {
 
     // Text operations
     pub async fn insert_char_at_cursor(&mut self, ch: char) -> EditorResult<()> {
-        todo!()
+        match self.current_buffer_id {
+            None => Err(NoActiveBuffer),
+            Some(buffer_id) => {
+                Ok(self.client
+                    .insert_char(buffer_id, self.client.get_cursor_position(buffer_id).await?, ch).await?)
+            }
+        }
     }
     pub async fn delete_char_at_cursor(&mut self) -> EditorResult<()> {
         todo!()
@@ -110,7 +116,10 @@ impl Editor {
         todo!()
     }
     pub async fn set_cursor_position(&mut self, position: usize) -> EditorResult<()> {
-        todo!()
+        match self.current_buffer_id {
+            None => Err(NoActiveBuffer),
+            Some(buffer_id) => Ok(self.client.set_cursor_position(buffer_id, position).await?),
+        }
     }
     pub async fn get_cursor_display_position(&self) -> EditorResult<(usize, usize)> {
         todo!()
