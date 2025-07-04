@@ -1,7 +1,8 @@
 use crate::client::editor_client::{ClientError, EditorClient};
 use crate::editor::EditorError::NoActiveBuffer;
 use crate::server::events::{BufferId, EditMode};
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use crate::syntax::SyntaxHighlighter;
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use crossterm::terminal::{
     EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
 };
@@ -10,6 +11,8 @@ use std::fs::read_to_string;
 use std::io::{Write, stdout};
 use std::path::PathBuf;
 use crossterm::style::Print;
+use ropey::Rope;
+use tree_sitter::Tree;
 
 #[derive(Debug)]
 pub enum EditorError {
@@ -42,6 +45,8 @@ pub struct Editor {
     status_message: String,
     viewport_size: usize,
     scroll_offset: usize,
+    syntax_highlighter: SyntaxHighlighter,
+    syntax_tree: Option<Tree>,
 }
 
 impl Editor {
@@ -55,6 +60,8 @@ impl Editor {
             status_message: "Hello from rust-text-editor".to_string(),
             viewport_size: 0,
             scroll_offset: 0,
+            syntax_highlighter: SyntaxHighlighter::new(),
+            syntax_tree: None,
         })
     }
     pub async fn with_content(content: String) -> EditorResult<Self> {
@@ -69,14 +76,24 @@ impl Editor {
             status_message: "Hello from rust-text-editor".to_string(),
             viewport_size: 0,
             scroll_offset: 0,
+            syntax_highlighter: SyntaxHighlighter::new(),
+            syntax_tree: None,
         })
     }
     pub async fn open_file(path: PathBuf) -> EditorResult<Self> {
         let content = read_to_string(&path)?;
 
-        let mut new_editor = Self::with_content(content).await?;
+        let mut new_editor = Self::with_content(content.clone()).await?;
         new_editor.status_message = format!("Opened file: {}", path.display());
-        new_editor.current_file = Some(path);
+        new_editor.current_file = Some(path.clone());
+
+        // Set up syntax highlighting for this file
+        if let Err(e) = new_editor.syntax_highlighter.set_language_from_path(&path) {
+            eprintln!("Failed to set syntax language: {}", e);
+        }
+        
+        // Parse the content for syntax highlighting
+        new_editor.syntax_tree = new_editor.syntax_highlighter.parse(&content);
 
         Ok(new_editor)
     }
@@ -117,6 +134,7 @@ impl Editor {
                     )
                     .await?;
                 self.is_modified = true;
+                self.update_syntax_tree().await?;
                 Ok(())
             }
         }
@@ -129,6 +147,7 @@ impl Editor {
                     .delete_char(buffer_id, self.client.get_cursor_position(buffer_id).await?)
                     .await?;
                 self.is_modified = true;
+                self.update_syntax_tree().await?;
                 Ok(())
             }
         }
@@ -147,6 +166,7 @@ impl Editor {
                         .await?;
                 }
                 self.is_modified = true;
+                self.update_syntax_tree().await?;
                 Ok(())
             }
         }
@@ -366,6 +386,14 @@ impl Editor {
         Ok((viewport_row, cursor_col))
     }
 
+    async fn update_syntax_tree(&mut self) -> EditorResult<()> {
+        if let Some(buffer_id) = self.current_buffer_id {
+            let content = self.client.get_content(buffer_id).await?;
+            self.syntax_tree = self.syntax_highlighter.parse(&content);
+        }
+        Ok(())
+    }
+
     // Terminal integration
     pub async fn run(&mut self) -> EditorResult<()> {
         if self.current_buffer_id.is_none() {
@@ -410,7 +438,7 @@ impl Editor {
         execute!(stdout(), cursor::Hide).map_err(|e| EditorError::IoError(e))?;
         execute!(stdout(), cursor::MoveTo(0, 0)).map_err(|e| EditorError::IoError(e))?;
 
-        // Render visible lines
+        // Render visible lines with syntax highlighting
         let visible_lines = self.get_visible_lines().await?;
 
         for display_row in 0..content_height {
@@ -418,8 +446,8 @@ impl Editor {
             execute!(stdout(), terminal::Clear(terminal::ClearType::CurrentLine)).map_err(|e| EditorError::IoError(e))?;
 
             if display_row < visible_lines.len() {
-                // Render actual line content
-                execute!(stdout(), Print(&visible_lines[display_row])).map_err(|e| EditorError::IoError(e))?;
+                // Render line with syntax highlighting
+                self.render_highlighted_line(&visible_lines[display_row], self.scroll_offset + display_row).await?;
             } else {
                 // Render empty line indicator
                 execute!(stdout(), Print("~")).map_err(|e| EditorError::IoError(e))?;
@@ -437,6 +465,56 @@ impl Editor {
         stdout().flush().map_err(|e| EditorError::IoError(e))?;
         Ok(())
 
+    }
+
+    async fn render_highlighted_line(&mut self, line: &str, line_idx: usize) -> EditorResult<()> {
+        // If we don't have a syntax tree, just print the line as-is
+        let Some(ref tree) = self.syntax_tree else {
+            execute!(stdout(), Print(line)).map_err(|e| EditorError::IoError(e))?;
+            return Ok(());
+        };
+
+        // Get the buffer content as a rope for syntax highlighting
+        let buffer_id = self.current_buffer_id.ok_or(NoActiveBuffer)?;
+        let content = self.client.get_content(buffer_id).await?;
+        let rope = Rope::from_str(&content);
+
+        // Get highlights for this line
+        let highlights = self.syntax_highlighter.highlight_line(&rope, line_idx, tree);
+
+        if highlights.is_empty() {
+            // No highlights, just print the line
+            execute!(stdout(), Print(line)).map_err(|e| EditorError::IoError(e))?;
+        } else {
+            // Apply highlights
+            let mut last_end = 0;
+            let line_chars: Vec<char> = line.chars().collect();
+ 
+            for (start, end, highlight_type) in highlights {
+                // Print text before highlight
+                if start > last_end {
+                    let text: String = line_chars[last_end..start].iter().collect();
+                    execute!(stdout(), Print(text)).map_err(|e| EditorError::IoError(e))?;
+                }
+
+                // Print highlighted text
+                if end <= line_chars.len() {
+                    let text: String = line_chars[start..end].iter().collect();
+                    let style = highlight_type.to_style();
+                    execute!(stdout(), crossterm::style::PrintStyledContent(style.apply(text))).map_err(|e| EditorError::IoError(e))?;
+                }
+
+                last_end = end;
+            }
+
+            // Print remaining text after last highlight
+            if last_end < line_chars.len() {
+                let text: String = line_chars[last_end..].iter().collect();
+                execute!(stdout(), Print(text)).map_err(|e| EditorError::IoError(e))?;
+            }
+        }
+
+        Ok(())
     }
 
     async fn render_status_lines(&mut self) -> EditorResult<()> {
@@ -460,9 +538,9 @@ impl Editor {
         execute!(stdout(), terminal::Clear(terminal::ClearType::CurrentLine)).map_err(|e| EditorError::IoError(e))?;
 
         let help_text = match self.get_current_mode().await? {
-            EditMode::Normal => "i=Insert, v=Visual, :=Command, Ctrl+S=Save, Ctrl+Q=Quit",
-            EditMode::Insert => "ESC=Normal, Ctrl+S=Save",
-            EditMode::Visual => "ESC=Normal, d=Delete, y=Yank",
+            EditMode::Normal => "i=Insert, v=Visual, :=Command",
+            EditMode::Insert => "ESC=Normal",
+            EditMode::Visual => "ESC=Normal",
             EditMode::Command => "ESC=Normal, Enter=Execute",
         };
 
@@ -484,7 +562,11 @@ impl Editor {
             EditMode::Normal => self.handle_normal_mode_input(key_event).await?,
             EditMode::Insert => self.handle_insert_mode_input(key_event).await?,
             EditMode::Visual => self.handle_visual_mode_input(key_event).await?,
-            EditMode::Command => self.handle_command_mode_input(key_event).await?,
+            EditMode::Command => {
+                if self.handle_command_mode_input(key_event).await? {
+                    return Ok(true); // Signal to exit the event loop
+                }
+            }
         }
 
         Ok(false)
@@ -564,7 +646,7 @@ impl Editor {
         Ok(())
     }
 
-    async fn handle_command_mode_input(&mut self, key_event: KeyEvent) -> EditorResult<()> {
+    async fn handle_command_mode_input(&mut self, key_event: KeyEvent) -> EditorResult<bool> {
         match key_event.code {
             KeyCode::Esc => {
                 self.enter_normal_mode().await?;
@@ -572,7 +654,9 @@ impl Editor {
             }
             KeyCode::Enter => {
                 // Execute command (basic implementation)
-                self.execute_command().await?;
+                if self.execute_command().await? {
+                    return Ok(true); // Signal to exit the event loop
+                }
                 self.enter_normal_mode().await?;
             }
             KeyCode::Char(ch) => {
@@ -587,10 +671,10 @@ impl Editor {
             }
             _ => {}
         }
-        Ok(())
+        Ok(false)
     }
 
-    async fn execute_command(&mut self) -> EditorResult<()> {
+    async fn execute_command(&mut self) -> EditorResult<bool> {
         let command = self.status_message.trim_start_matches(':').to_string();
 
         match command.as_str() {
@@ -598,11 +682,11 @@ impl Editor {
                 if self.is_modified {
                     self.status_message = "File modified! Use :q! to quit without saving".to_string();
                 } else {
-                    std::process::exit(0);
+                    return Ok(true); // Signal to exit the event loop
                 }
             }
             "q!" => {
-                std::process::exit(0);
+                return Ok(true); // Signal to exit the event loop
             }
             "w" => {
                 if let Err(e) = self.save().await {
@@ -615,7 +699,7 @@ impl Editor {
                 if let Err(e) = self.save().await {
                     self.status_message = format!("Save failed: {:?}", e);
                 } else {
-                    std::process::exit(0);
+                    return Ok(true); // Signal to exit the event loop
                 }
             }
             _ if command.starts_with("w ") => {
@@ -632,7 +716,7 @@ impl Editor {
             }
         }
 
-        Ok(())
+        Ok(false)
     }
 }
 

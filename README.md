@@ -1,6 +1,11 @@
 # Rust Text Editor
 
-A modern, terminal-based text editor built in Rust with vim-like keybindings and a client-server architecture.
+![](./images/editor_example.png)
+
+A terminal-based text editor built in Rust with vim-like keybindings and a client-server architecture.
+This is a toy project.
+
+
 
 ## Features
 
